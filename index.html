@@ -3,183 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPadで○×ゲーム</title>
+    <title>iPad Web MIDI PoC</title>
     <style>
-        /* スタイルの設定 */
-        body {
-            font-family: "Hiragino Kaku Gothic ProN", sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        #status {
-            font-size: 1.5rem;
-            margin-bottom: 20px;
-            font-weight: bold;
-            color: #555;
-            height: 1.5rem; /* 高さを固定してガタつきを防ぐ */
-        }
-
-        .board {
-            display: grid;
-            grid-template-columns: repeat(3, 100px);
-            grid-template-rows: repeat(3, 100px);
-            gap: 10px;
-        }
-
-        .cell {
-            width: 100px;
-            height: 100px;
-            background-color: white;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            user-select: none; /* テキスト選択を防ぐ */
-            -webkit-tap-highlight-color: transparent; /* タップ時のハイライトを消す */
-        }
-
-        .cell.x { color: #ff4757; } /* ×の色 */
-        .cell.o { color: #2ed573; } /* ○の色 */
-
-        button {
-            margin-top: 30px;
-            padding: 15px 30px;
-            font-size: 1.2rem;
-            background-color: #3742fa;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-        }
-
-        button:active {
-            transform: scale(0.98);
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; background-color: #f4f4f4; }
+        h1 { font-size: 1.2rem; color: #333; }
+        .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, button { width: 100%; font-size: 1rem; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ccc; }
+        button { background-color: #007aff; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:active { background-color: #005bb5; }
+        button:disabled { background-color: #ccc; }
+        #log { height: 200px; overflow-y: scroll; background: #222; color: #0f0; font-family: monospace; padding: 10px; border-radius: 8px; font-size: 0.8rem; }
+        .status { margin-bottom: 10px; font-size: 0.9rem; color: #666; }
     </style>
 </head>
 <body>
 
-    <h1>○×ゲーム</h1>
-    <div id="status">プレイヤー「○」の番です</div>
-    
-    <div class="board" id="board">
-        <div class="cell" data-index="0"></div>
-        <div class="cell" data-index="1"></div>
-        <div class="cell" data-index="2"></div>
-        <div class="cell" data-index="3"></div>
-        <div class="cell" data-index="4"></div>
-        <div class="cell" data-index="5"></div>
-        <div class="cell" data-index="6"></div>
-        <div class="cell" data-index="7"></div>
-        <div class="cell" data-index="8"></div>
+    <h1>iPad MIDI PoC</h1>
+
+    <div id="status" class="status">MIDIアクセスを待機中...</div>
+
+    <div class="card">
+        <label for="midiInput">MIDI 入力 (受信)</label>
+        <select id="midiInput"><option value="">デバイスを選択...</option></select>
+
+        <label for="midiOutput">MIDI 出力 (送信)</label>
+        <select id="midiOutput"><option value="">デバイスを選択...</option></select>
     </div>
 
-    <button onclick="resetGame()">もう一度あそぶ</button>
+    <div class="card">
+        <button id="playBtn" disabled>C4を5秒間鳴らす</button>
+    </div>
+
+    <div class="card">
+        <label>受信データログ</label>
+        <div id="log">Waiting for MIDI input...</div>
+    </div>
 
     <script>
-        // JavaScriptのロジック
-        let currentPlayer = "o"; // 最初は○から
-        let gameActive = true;
-        let gameState = ["", "", "", "", "", "", "", "", ""];
+        let midiAccess = null;
+        let activeOutput = null;
 
-        const statusDisplay = document.getElementById('status');
-        const cells = document.querySelectorAll('.cell');
+        const statusDiv = document.getElementById('status');
+        const inputSelect = document.getElementById('midiInput');
+        const outputSelect = document.getElementById('midiOutput');
+        const playBtn = document.getElementById('playBtn');
+        const logDiv = document.getElementById('log');
 
-        // 勝ちパターンの定義
-        const winningConditions = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // 縦
-            [0, 4, 8], [2, 4, 6]             // 斜め
-        ];
+        // MIDIアクセスのリクエスト
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess({ sysex: false })
+                .then(onMIDISuccess, onMIDIFailure);
+        } else {
+            statusDiv.textContent = "このブラウザはWeb MIDI APIをサポートしていません。";
+            statusDiv.style.color = "red";
+        }
 
-        // セルがクリックされた時の処理
-        cells.forEach(cell => {
-            cell.addEventListener('click', handleCellClick);
+        function onMIDISuccess(access) {
+            midiAccess = access;
+            statusDiv.textContent = "MIDIアクセス成功。デバイスを選択してください。";
+            updateDeviceList();
+
+            // 接続状態が変わったらリストを更新
+            midiAccess.onstatechange = updateDeviceList;
+        }
+
+        function onMIDIFailure() {
+            statusDiv.textContent = "MIDIアクセスに失敗しました。";
+            statusDiv.style.color = "red";
+        }
+
+        // デバイスリストの更新
+        function updateDeviceList() {
+            // 入力ポート
+            const inputs = midiAccess.inputs;
+            inputSelect.innerHTML = '<option value="">デバイスを選択...</option>';
+            inputs.forEach(input => {
+                const option = document.createElement('option');
+                option.value = input.id;
+                option.text = input.name;
+                inputSelect.appendChild(option);
+                // 入力イベントのリスナー登録
+                input.onmidimessage = handleMIDIMessage;
+            });
+
+            // 出力ポート
+            const outputs = midiAccess.outputs;
+            outputSelect.innerHTML = '<option value="">デバイスを選択...</option>';
+            outputs.forEach(output => {
+                const option = document.createElement('option');
+                option.value = output.id;
+                option.text = output.name;
+                outputSelect.appendChild(option);
+            });
+            
+            // ボタン有効化判定
+            playBtn.disabled = outputSelect.options.length <= 1;
+        }
+
+        // 3. MIDI入力データの表示処理
+        function handleMIDIMessage(event) {
+            // 選択されたデバイスからの入力のみ表示したい場合はここでIDチェックを行う
+            if (inputSelect.value && event.target.id !== inputSelect.value) return;
+
+            const [status, data1, data2] = event.data;
+            const command = status >> 4;
+            const channel = status & 0xf;
+            
+            // ログの整形
+            const msg = `[CH:${channel + 1}] CMD:${command.toString(16)} Note:${data1} Vel:${data2}`;
+            const line = document.createElement('div');
+            line.textContent = msg;
+            logDiv.prepend(line); // 新しいものを上に
+        }
+
+        // 2. C4の音を5秒鳴らす処理
+        playBtn.addEventListener('click', () => {
+            const outputId = outputSelect.value;
+            if (!outputId) {
+                alert("出力デバイスを選択してください");
+                return;
+            }
+
+            const output = midiAccess.outputs.get(outputId);
+            if (output) {
+                // MIDI Note On: 0x90 (144), Note: 60 (C4), Velocity: 100
+                output.send([0x90, 60, 100]);
+                logDiv.prepend(document.createTextNode("OUTPUT: Note ON (C4)\n"));
+
+                // 5秒後にNote Off
+                setTimeout(() => {
+                    // MIDI Note Off: 0x80 (128), Note: 60, Velocity: 0
+                    output.send([0x80, 60, 0]);
+                    logDiv.prepend(document.createTextNode("OUTPUT: Note OFF (C4)\n"));
+                }, 5000);
+            }
         });
 
-        function handleCellClick(e) {
-            const clickedCell = e.target;
-            const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
+        // 出力デバイス変更時の処理
+        outputSelect.addEventListener('change', () => {
+             playBtn.disabled = !outputSelect.value;
+        });
 
-            // すでに埋まっているか、ゲーム終了なら何もしない
-            if (gameState[clickedCellIndex] !== "" || !gameActive) {
-                return;
-            }
-
-            handleCellPlayed(clickedCell, clickedCellIndex);
-            handleResultValidation();
-        }
-
-        function handleCellPlayed(clickedCell, clickedCellIndex) {
-            gameState[clickedCellIndex] = currentPlayer;
-            clickedCell.innerText = currentPlayer === "o" ? "○" : "×";
-            clickedCell.classList.add(currentPlayer);
-        }
-
-        function handleResultValidation() {
-            let roundWon = false;
-
-            // 勝ちパターンをチェック
-            for (let i = 0; i <= 7; i++) {
-                const winCondition = winningConditions[i];
-                let a = gameState[winCondition[0]];
-                let b = gameState[winCondition[1]];
-                let c = gameState[winCondition[2]];
-
-                if (a === '' || b === '' || c === '') {
-                    continue;
-                }
-                if (a === b && b === c) {
-                    roundWon = true;
-                    break;
-                }
-            }
-
-            if (roundWon) {
-                statusDisplay.innerText = `プレイヤー「${currentPlayer === "o" ? "○" : "×"}」の勝ち！`;
-                gameActive = false;
-                return;
-            }
-
-            // 引き分けチェック
-            let roundDraw = !gameState.includes("");
-            if (roundDraw) {
-                statusDisplay.innerText = "引き分けです！";
-                gameActive = false;
-                return;
-            }
-
-            // プレイヤー交代
-            currentPlayer = currentPlayer === "o" ? "x" : "o";
-            statusDisplay.innerText = `プレイヤー「${currentPlayer === "o" ? "○" : "×"}」の番です`;
-        }
-
-        function resetGame() {
-            gameActive = true;
-            currentPlayer = "o";
-            gameState = ["", "", "", "", "", "", "", "", ""];
-            statusDisplay.innerText = `プレイヤー「○」の番です`;
-            document.querySelectorAll('.cell').forEach(cell => {
-                cell.innerText = "";
-                cell.classList.remove('x', 'o');
-            });
-        }
     </script>
 </body>
 </html>
+
+
