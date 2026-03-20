@@ -1,0 +1,61 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #f9f9f9
+skinparam packageStyle rectangle
+
+package "Data & Logic Layer (Model)" {
+    class TheoryEngine {
+        + analyze(key, chord) : AnalysisResult
+        --
+        Determines:
+        - Root Semitone (0-11)
+        - Chord Quality (Major/Minor)
+        - Scale Notes
+    }
+}
+
+package "Mapping Layer (Adapter)" {
+    class CoFLogic {
+        + getPositionForChord(rootSemi, isMinorQuality) : {index, ring}
+        + getPositionForKey(rootSemi, isMinorKey) : {index, ring}
+        --
+        **Logic Fix:**
+        If Chord is Major:
+          Target = Outer Ring
+          Index = Map(Root)
+        If Chord is Minor:
+          Target = Inner Ring
+          Index = Map(Root + 3 semitones)
+          (e.g., Am maps to C's position)
+    }
+}
+
+package "Presentation Layer (View)" {
+    class App {
+        + toggleView(mode)
+        + highlightRow(index)
+    }
+
+    class KeyboardUI {
+        + update(analysisMap)
+    }
+
+    class CoFUI {
+        - svg, knob, arrows
+        + init()
+        + update(rotationIndex, highlightTargets)
+        + renderKnob()
+        --
+        **Responsibilities:**
+        - Pure rendering (SVG)
+        - Handle drag events
+        - Desaturated colors (CSS)
+    }
+}
+
+App --> TheoryEngine : 1. Analyze
+App --> CoFLogic : 2. Get CoF Coordinates
+App --> CoFUI : 3. Render
+App --> KeyboardUI : 3. Render
+
+@enduml

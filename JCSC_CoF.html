@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JCSC + CoF Integrated Tool (v5)</title>
+<style>
+    /* === Global Variables & Theme === */
+    :root {
+        --bg-body: #f4f4f4;
+        --bg-container: #fff;
+        --text-main: #333;
+        --text-sub: #666;
+        --border-color: #ccc;
+        
+        /* Table & UI Colors */
+        --th-bg: #f0f0f0;
+        --tr-even: #f9f9f9;
+        --tr-hover: #eaeaea;
+        --tr-selected: #e3f2fd;
+        --input-focus: #bbdefb;
+        --btn-bg: #e0e0e0;
+        --btn-text: #333;
+
+        /* Keyboard Colors */
+        --key-white: #fff;
+        --key-black: #333;
+        --chord-bg: #b3e5fc;
+        --chord-border: #81d4fa;
+
+        /* CoF Colors (Desaturated) */
+        --stroke-cof: #aaa;
+        --bg-staff: #fff;
+        --stroke-staff: #000;
+        --arrow-color: #777;
+        
+        /* Highlights (Muted for harmony) */
+        --hl-root: #ef5350;        /* Muted Red */
+        --hl-root-border: #e53935;
+        --hl-diatonic: #e1f5fe;    /* Light Blue */
+        --hl-diatonic-border: #81d4fa;
+        --hl-tritone: #fff9c4;     /* Pale Yellow */
+        --hl-tritone-border: #fbc02d;
+    }
+
+    body.dark-mode {
+        --bg-body: #121212;
+        --bg-container: #1e1e1e;
+        --text-main: #e0e0e0;
+        --text-sub: #aaa;
+        --border-color: #444;
+        
+        --th-bg: #2d2d2d;
+        --tr-even: #252525;
+        --tr-hover: #333;
+        --tr-selected: #152d45;
+        --input-focus: #263238;
+        --btn-bg: #333;
+        --btn-text: #ccc;
+
+        --key-white: #ddd;
+        --key-black: #111;
+        --chord-bg: #01579b;
+        --chord-border: #0277bd;
+
+        --stroke-cof: #555;
+        --bg-staff: #2c2c2c;
+        --stroke-staff: #e0e0e0;
+        --arrow-color: #bbb;
+        
+        /* Dark Mode Highlights */
+        --hl-root: #c62828;        /* Deep Red */
+        --hl-root-border: #ef5350;
+        --hl-diatonic: #023652;    /* Deep Blue */
+        --hl-diatonic-border: #0277bd;
+        --hl-tritone: #574d18;     /* Dark Yellow/Gold */
+        --hl-tritone-border: #a89032;
+    }
+
+    body { 
+        font-family: 'Segoe UI', Helvetica, Arial, sans-serif; 
+        background: var(--bg-body); color: var(--text-main);
+        margin: 0; padding: 0; 
+        height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* === Header === */
+    header {
+        background: var(--bg-container); padding: 8px 15px; 
+        border-bottom: 1px solid var(--border-color);
+        display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+    }
+    h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    .header-controls { display: flex; gap: 8px; }
+    .btn { 
+        padding: 4px 12px; font-size: 12px; cursor: pointer; 
+        background: var(--btn-bg); color: var(--btn-text);
+        border: 1px solid var(--border-color); border-radius: 4px; 
+    }
+    .btn.active { background: var(--tr-selected); border-color: var(--chord-border); font-weight: bold; color: var(--text-main); }
+    .btn:hover { opacity: 0.9; }
+
+    /* === Visualization Views === */
+    .view-container {
+        background: var(--bg-container); border-bottom: 1px solid var(--border-color);
+        flex-shrink: 0; display: flex; justify-content: center; align-items: center;
+        width: 100%; overflow-y: auto; padding: 10px 0;
+        min-height: 140px; /* Min height for keyboard */
+    }
+
+    /* -- Keyboard View -- */
+    #view-keyboard { width: 100%; display: none; flex-direction: column; align-items: center; }
+    #view-keyboard.active { display: flex; }
+    
+    .keyboard-wrapper { overflow-x: auto; display: flex; justify-content: center; width: 100%; padding-bottom: 10px; }
+    .keyboard { display: flex; position: relative; height: 100px; padding-top: 5px; width: max-content; }
+    .key { border: 1px solid #999; border-radius: 0 0 3px 3px; position: relative; z-index: 1; display: flex; justify-content: center; }
+    .key.white { width: 32px; height: 95px; background: var(--key-white); }
+    .key.black { width: 22px; height: 60px; background: var(--key-black); margin-left: -11px; margin-right: -11px; z-index: 2; border-radius: 0 0 2px 2px; }
+    .key.white.chord-bg { background: var(--chord-bg) !important; } 
+    .key.black.chord-bg { background: var(--chord-bg) !important; border-color: var(--chord-border); }
+    .key-label { position: absolute; bottom: 2px; width: 100%; text-align: center; font-size: 9px; color: #aaa; pointer-events: none; }
+    .key.black .key-label { display: none; }
+    .dot { position: absolute; width: 10px; height: 10px; border-radius: 50%; bottom: 15px; z-index: 5; border: 1px solid rgba(255,255,255,0.9); }
+    .key.black .dot { bottom: 8px; }
+    /* Dot Colors */
+    .dot.root { background: #ef5350; transform: scale(1.2); } 
+    .dot.guide { background: #ffa726; } 
+    .dot.avoid { background: #8d6e63; } 
+    .dot.scale { background: #e0e0e0; }
+    body.dark-mode .dot.scale { background: #555; }
+
+    .legend { display: flex; gap: 15px; font-size: 11px; opacity: 0.8; }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .l-box { width: 10px; height: 10px; border: 1px solid #ccc; display: inline-block; }
+    .l-bg-chord { background: var(--chord-bg); }
+    .l-circle { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .l-root { background: #ef5350; } .l-guide { background: #ffa726; } .l-avoid { background: #8d6e63; }
+
+    /* -- CoF View -- */
+    #view-cof { width: 100%; display: none; justify-content: center; align-items: center; gap: 30px; padding: 20px; }
+    #view-cof.active { display: flex; flex-wrap: wrap; }
+
+    .circle-wrapper { width: 420px; height: 420px; position: relative; flex-shrink: 0; user-select: none; }
+    /* Responsive scaling for small screens */
+    @media (max-height: 700px) { .circle-wrapper { transform: scale(0.7); margin: -50px; } }
+
+    svg { width: 100%; height: 100%; overflow: visible; }
+    .sector { stroke: var(--stroke-cof); stroke-width: 1px; fill: var(--bg-container); cursor: grab; transition: fill 0.2s; }
+    .sector:hover { opacity: 0.9; }
+    
+    .sector-text, .sector-text-inner { 
+        font-size: 14px; font-weight: normal; fill: var(--text-main); pointer-events: none; 
+        text-anchor: middle; dominant-baseline: middle; transition: font-weight 0.2s;
+    }
+    .sector-text-inner { fill: var(--text-sub); }
+    
+    /* Bold Logic */
+    .circle-wrapper.mode-major .sector-text { font-weight: bold; }
+    .circle-wrapper.mode-minor .sector-text-inner { font-weight: bold; fill: var(--text-main); }
+    
+    /* Highlights */
+    .highlight-root { fill: var(--hl-root) !important; stroke: var(--hl-root-border) !important; stroke-width: 2px !important; }
+    .highlight-diatonic { fill: var(--hl-diatonic) !important; stroke: var(--hl-diatonic-border) !important; stroke-width: 1px !important; }
+    .highlight-tritone { fill: var(--hl-tritone) !important; stroke: var(--hl-tritone-border) !important; stroke-width: 1px !important; stroke-dasharray: 4 2; }
+
+    /* Knob */
+    .handle-group { cursor: grab; }
+    .handle-group:active { cursor: grabbing; }
+    .handle-knob { stroke: #999; stroke-width: 1px; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.3)); }
+    .handle-arrow { fill: var(--arrow-color); pointer-events: none; }
+    .handle-hit { fill: transparent; }
+
+    /* Staff Box */
+    .staff-box { 
+        width: 160px; height: 140px; background: var(--bg-staff); 
+        border: 1px solid var(--border-color); border-radius: 4px; 
+        display: flex; justify-content: center; align-items: center; 
+    }
+    .st-line { stroke: var(--stroke-staff); stroke-width: 1; }
+    .st-clef-stroke { fill: none; stroke: var(--stroke-staff); stroke-width: 7px; stroke-linecap: round; stroke-linejoin: round; }
+    .st-clef-fill { fill: var(--stroke-staff); stroke: none; }
+    .st-acc-custom { fill: none; stroke: var(--stroke-staff); stroke-linecap: round; stroke-linejoin: round; }
+    .st-brace { stroke: var(--stroke-staff); stroke-width: 2; }
+
+    /* === Table Area === */
+    .main-content { flex-grow: 1; overflow: hidden; padding: 10px; display: flex; flex-direction: column; }
+    .table-wrapper { border: 1px solid var(--border-color); background: var(--bg-container); overflow: auto; height: 100%; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--border-color); white-space: nowrap; color: var(--text-main); vertical-align: middle; }
+    th { background: var(--th-bg); position: sticky; top: 0; z-index: 10; font-weight: 600; text-align: center; border-bottom: 2px solid var(--border-color); }
+    tr:nth-child(even) { background: var(--tr-even); }
+    tr:hover { background: var(--tr-hover); }
+    tr.selected-row { background: var(--tr-selected) !important; }
+    
+    .editable-cell { display: inline-block; min-width: 30px; font-weight: bold; outline: none; padding: 2px 4px; border-radius: 3px; border: 1px solid transparent; }
+    .editable-cell:focus { background: var(--input-focus); border-color: #86b7fe; }
+    .col-key .editable-cell { color: #0277bd; text-align: center; width: 100%; }
+    body.dark-mode .col-key .editable-cell { color: #4fc3f7; }
+    .col-chord .editable-cell { text-align: center; width: 100%; }
+    .mono-col { font-family: 'Consolas', monospace; font-size: 12px; }
+    .btn-action { width: 22px; height: 22px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--btn-text); cursor: pointer; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>JCSC + CoF Integrated</h1>
+    <div class="header-controls">
+        <button class="btn active" id="btnModeKey" onclick="app.toggleView('keyboard')">🎹 Keyboard</button>
+        <button class="btn" id="btnModeCoF" onclick="app.toggleView('cof')">⚪ Circle</button>
+        <button class="btn" onclick="app.copyTSV()">Copy TSV</button>
+        <button class="btn" onclick="document.body.classList.toggle('dark-mode')">🌙</button>
+    </div>
+</header>
+
+<div class="view-container">
+    <div id="view-keyboard" class="active">
+        <div class="keyboard-wrapper"><div id="keyboard" class="keyboard"></div></div>
+        <div class="legend">
+            <div class="legend-item"><span class="l-box l-bg-chord"></span> Chord Tone</div>
+            <div class="legend-item"><span class="l-circle l-root"></span> Root</div>
+            <div class="legend-item"><span class="l-circle l-guide"></span> Guide</div>
+        </div>
+    </div>
+    <div id="view-cof">
+        <div class="circle-wrapper" id="circleWrapper"></div>
+        <div class="staff-box" id="staffBox"></div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="table-wrapper">
+        <table id="mainTable">
+            <thead>
+                <tr>
+                    <th style="width:30px">#</th>
+                    <th style="width:50px">Key</th>
+                    <th style="width:80px">Chord</th>
+                    <th style="width:50px">Deg</th>
+                    <th style="width:50px">Func</th>
+                    <th style="width:120px">Scale</th>
+                    <th>Chord Tones</th>
+                    <th>Scale Notes</th>
+                    <th style="width:70px">Edit</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// =======================================================
+// 1. DATA LAYER (Music Theory DB)
+// =======================================================
+const DB = {
+    intervals: [
+        {ID:"P1",Semi:0,Deg:0}, {ID:"m2",Semi:1,Deg:1}, {ID:"M2",Semi:2,Deg:1},
+        {ID:"m3",Semi:3,Deg:2}, {ID:"M3",Semi:4,Deg:2}, {ID:"P4",Semi:5,Deg:3},
+        {ID:"A4",Semi:6,Deg:3}, {ID:"d5",Semi:6,Deg:4}, {ID:"P5",Semi:7,Deg:4},
+        {ID:"A5",Semi:8,Deg:4}, {ID:"m6",Semi:8,Deg:5}, {ID:"M6",Semi:9,Deg:5},
+        {ID:"d7",Semi:9,Deg:6}, {ID:"m7",Semi:10,Deg:6}, {ID:"M7",Semi:11,Deg:6},
+        {ID:"b9",Semi:13,Deg:8}, {ID:"9",Semi:14,Deg:8}, {ID:"#9",Semi:15,Deg:8},
+        {ID:"11",Semi:17,Deg:10}, {ID:"#11",Semi:18,Deg:10}, {ID:"b13",Semi:20,Deg:12}, {ID:"13",Semi:21,Deg:12}
+    ],
+    chords: [
+        {Sym:"",Struct:"P1,M3,P5",Minor:false}, {Sym:"m",Struct:"P1,m3,P5",Minor:true},
+        {Sym:"dim",Struct:"P1,m3,d5",Minor:true}, {Sym:"aug",Struct:"P1,M3,A5",Minor:false},
+        {Sym:"M7",Struct:"P1,M3,P5,M7",Minor:false}, {Sym:"M6",Struct:"P1,M3,P5,M6",Minor:false},
+        {Sym:"m7",Struct:"P1,m3,P5,m7",Minor:true}, {Sym:"m6",Struct:"P1,m3,P5,M6",Minor:true},
+        {Sym:"m7b5",Struct:"P1,m3,d5,m7",Minor:true}, {Sym:"dim7",Struct:"P1,m3,d5,d7",Minor:true},
+        {Sym:"7",Struct:"P1,M3,P5,m7",Minor:false}, {Sym:"7b9",Struct:"P1,M3,P5,m7,b9",Minor:false},
+        {Sym:"7#9",Struct:"P1,M3,P5,m7,#9",Minor:false}, {Sym:"7alt",Struct:"P1,M3,d5,m7,b9,#9,b13",Minor:false},
+        {Sym:"mM7",Struct:"P1,m3,P5,M7",Minor:true}
+    ],
+    rules: [
+        {Key:"Major",Deg:"P1",Chd:"M7",Sc:"Ionian",Func:"T"}, {Key:"Major",Deg:"M2",Chd:"m7",Sc:"Dorian",Func:"SD"},
+        {Key:"Major",Deg:"M3",Chd:"m7",Sc:"Phrygian",Func:"T"}, {Key:"Major",Deg:"P4",Chd:"M7",Sc:"Lydian",Func:"SD"},
+        {Key:"Major",Deg:"P5",Chd:"7",Sc:"Mixolydian",Func:"D"}, {Key:"Major",Deg:"M6",Chd:"m7",Sc:"Aeolian",Func:"T"},
+        {Key:"Major",Deg:"M7",Chd:"m7b5",Sc:"Locrian",Func:"D"},
+        {Key:"Minor",Deg:"P1",Chd:"m7",Sc:"Aeolian",Func:"T"}, {Key:"Minor",Deg:"M2",Chd:"m7b5",Sc:"Locrian",Func:"SD"},
+        {Key:"Minor",Deg:"m3",Chd:"M7",Sc:"Ionian",Func:"T"}, {Key:"Minor",Deg:"P4",Chd:"m7",Sc:"Dorian",Func:"SD"},
+        {Key:"Minor",Deg:"P5",Chd:"7",Sc:"Phrygian Dominant",Func:"D"}, {Key:"Minor",Deg:"m6",Chd:"M7",Sc:"Lydian",Func:"SD"},
+        {Key:"Minor",Deg:"m7",Chd:"7",Sc:"Mixolydian",Func:"SD"}
+    ]
+};
+
+// =======================================================
+// 2. LOGIC LAYER (Theory Engine)
+// =======================================================
+class TheoryEngine {
+    constructor() {
+        this.intMap = {}; DB.intervals.forEach(i => this.intMap[i.ID] = i);
+        this.chdMap = {}; DB.chords.forEach(c => this.chdMap[c.Sym] = c);
+    }
+    parse(str) {
+        if(!str) return null;
+        const m = str.trim().match(/^([A-G])(b*|#*|x*)$/);
+        if(!m) return null;
+        const semiMap = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+        let acc = 0;
+        if(m[2].startsWith('b')) acc = -m[2].length;
+        if(m[2].startsWith('#')) acc = m[2].length;
+        return { name: m[1], acc: acc, semi: (semiMap[m[1]]+acc+120)%12 };
+    }
+    analyze(keyStr, chordStr) {
+        let kType="Major", kRootStr=keyStr;
+        if(keyStr.endsWith("m")) { kType="Minor"; kRootStr=keyStr.slice(0,-1); }
+        
+        const kRoot = this.parse(kRootStr);
+        const split = chordStr.match(/^([A-G](?:b+|#+)?)(.*)$/);
+        const cRoot = split ? this.parse(split[1]) : null;
+        const quality = split ? split[2] : "";
+
+        const res = { 
+            kSemi: kRoot?kRoot.semi:null, kMinor: kType==="Minor",
+            cSemi: cRoot?cRoot.semi:null, cMinor: false,
+            roman:"-", func:"-", scale:"-", tones:[], kbMap:{}, isFlat: false
+        };
+
+        // Flat Detection
+        if(kRootStr.includes('b') || kRootStr==='F') res.isFlat = true;
+
+        if(kRoot && cRoot) {
+            // Chord Quality Check
+            if(this.chdMap[quality]) res.cMinor = this.chdMap[quality].Minor;
+            else if(quality.includes('m') || quality.includes('dim')) res.cMinor = true;
+
+            // Interval Calculation
+            const dSemi = (cRoot.semi - kRoot.semi + 12) % 12;
+            const intObj = DB.intervals.find(i => i.Semi === dSemi); // Simplified lookup
+            const intID = intObj ? intObj.ID : "?";
+            
+            // Rule Matching
+            const rule = DB.rules.find(r => r.Key===kType && r.Deg===intID && r.Chd===quality) 
+                      || DB.rules.find(r => r.Key===kType && r.Deg===intID);
+            
+            if(rule) {
+                res.roman = rule.Deg; res.func = rule.Func; res.scale = rule.Sc;
+            } else {
+                res.roman = intID;
+            }
+
+            // Keyboard Map (Simple Chord Tones)
+            const chdDef = this.chdMap[quality];
+            if(chdDef) {
+                const parts = chdDef.Struct.split(',');
+                parts.forEach(p => {
+                    const iObj = this.intMap[p.trim()];
+                    if(iObj) {
+                        const noteSemi = (cRoot.semi + iObj.Semi) % 12;
+                        res.kbMap[noteSemi] = { isChord: true, type: p==='P1'?'root':null };
+                        res.tones.push(noteSemi); // placeholder
+                    }
+                });
+            }
+        }
+        return res;
+    }
+}
+
+// =======================================================
+// 3. MAPPING LAYER (CoF Logic)
+// =======================================================
+const CoFLogic = {
+    // Circle Order: C(0), G(7), D(2), A(9), E(4), B(11), F#(6), Db(1), Ab(8), Eb(3), Bb(10), F(5)
+    // We need map: Semitone -> Circle Index (0..11)
+    // C=0 -> 0
+    // Db=1 -> 7
+    // D=2 -> 2
+    // Eb=3 -> 9
+    // E=4 -> 4
+    // F=5 -> 11
+    // F#=6 -> 6
+    // G=7 -> 1
+    // Ab=8 -> 8
+    // A=9 -> 3
+    // Bb=10 -> 10
+    // B=11 -> 5
+    semiToIndex: {0:0, 1:7, 2:2, 3:9, 4:4, 5:11, 6:6, 7:1, 8:8, 9:3, 10:10, 11:5},
+
+    getKeyCoordinates(rootSemi, isMinorKey) {
+        if(rootSemi === null) return { idx:0, ring:'major' };
+        // If Key is Minor, we use relative Major for position
+        // e.g. Am (9) -> Rel C (0). 9+3=0. Index 0. Ring Minor (inner).
+        const targetSemi = isMinorKey ? (rootSemi + 3)%12 : rootSemi;
+        return { 
+            idx: this.semiToIndex[targetSemi], 
+            ring: isMinorKey ? 'minor' : 'major' // Used for bold text
+        };
+    },
+
+    getChordHighlight(rootSemi, isMinorQuality) {
+        if(rootSemi === null) return null;
+        // Logic Fix:
+        // If Chord is Minor (e.g. Ebm), we want to highlight the Inner Ring.
+        // Inner Ring at Index I corresponds to Relative Minor of Major(I).
+        // e.g. Index 6 (6 o'clock) -> Outer: F#, Inner: D#m/Ebm.
+        // Ebm (3) -> Rel Major Gb (6). 3+3=6. Index 6.
+        
+        let targetSemi = rootSemi;
+        if(isMinorQuality) targetSemi = (rootSemi + 3) % 12;
+        
+        return {
+            idx: this.semiToIndex[targetSemi],
+            type: isMinorQuality ? 'minor' : 'major'
+        };
+    }
+};
+
+// =======================================================
+// 4. PRESENTATION LAYER (UI)
+// =======================================================
+
+// --- Keyboard UI ---
+const KeyboardUI = {
+    init() {
+        const k = document.getElementById('keyboard');
+        let h = ''; 
+        const n=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; 
+        const b=[0,1,0,1,0,0,1,0,1,0,1,0];
+        for(let o=0;o<3;o++) for(let i=0;i<12;i++) 
+            h+=`<div class="key ${b[i]?'black':'white'}" data-semi="${i}"><div class="key-label">${n[i]}</div></div>`;
+        k.innerHTML = h + `<div class="key white" data-semi="0"><div class="key-label">C</div></div>`;
+    },
+    update(map) {
+        document.querySelectorAll('.key').forEach(k => {
+            k.classList.remove('chord-bg'); 
+            const d=k.querySelector('.dot'); if(d)d.remove();
+            const s=parseInt(k.getAttribute('data-semi'));
+            if(map && map[s]) { 
+                if(map[s].isChord) k.classList.add('chord-bg'); 
+                if(map[s].type) k.innerHTML+=`<div class="dot ${map[s].type}"></div>`; 
+            }
+        });
+    }
+};
+
+// --- CoF UI ---
+const CoFUI = {
+    majNames: ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"],
+    minNames: ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "D#m", "Bbm", "Fm", "Cm", "Gm", "Dm"],
+    flatMaj: {5:"Cb", 6:"Gb", 7:"Db"},
+    flatMin: {5:"Abm", 6:"Ebm", 7:"Bbm"},
+    
+    cx: 210, cy: 210, 
+    rOuter: 140, rMiddle: 95, rInner: 45,
+    rotation: 0, 
+
+    init() {
+        const wrap = document.getElementById('circleWrapper');
+        wrap.innerHTML = '';
+        this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        this.svg.setAttribute("viewBox", "0 0 420 420");
+        
+        // Gradient Defs
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        defs.innerHTML = `<radialGradient id="knobGrad" cx="50%" cy="50%" r="50%" fx="30%" fy="30%"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#999"/></radialGradient>`;
+        this.svg.appendChild(defs);
+        
+        this.wheelG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.svg.appendChild(this.wheelG);
+        
+        for(let i=0; i<12; i++) {
+            const deg = i * 30;
+            this.wheelG.appendChild(this.createSector(this.rMiddle, this.rOuter, deg, this.majNames[i], i, 'major'));
+            this.wheelG.appendChild(this.createSector(this.rInner, this.rMiddle, deg, this.minNames[i], i, 'minor'));
+        }
+        
+        this.renderKnob();
+        this.setupDrag();
+        wrap.appendChild(this.svg);
+    },
+
+    createSector(rIn, rOut, deg, text, i, type) {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const rad = d => (d-90)*Math.PI/180;
+        const s=rad(deg-15), e=rad(deg+15);
+        const x1=this.cx+rOut*Math.cos(s), y1=this.cy+rOut*Math.sin(s);
+        const x2=this.cx+rOut*Math.cos(e), y2=this.cy+rOut*Math.sin(e);
+        const x3=this.cx+rIn*Math.cos(e), y3=this.cy+rIn*Math.sin(e);
+        const x4=this.cx+rIn*Math.cos(s), y4=this.cy+rIn*Math.sin(s);
+        
+        path.setAttribute("d", `M ${x1} ${y1} A ${rOut} ${rOut} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 0 0 ${x4} ${y4} Z`);
+        path.setAttribute("class", `sector sector-${type}`);
+        path.setAttribute("data-idx", i);
+        path.onclick = () => app.jumpToCoF(i);
+        g.appendChild(path);
+
+        const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        txt.textContent = text;
+        txt.setAttribute("id", `lbl-${type}-${i}`);
+        txt.setAttribute("class", `sector-text${type==='minor'?'-inner':''}`);
+        txt.setAttribute("data-deg", deg);
+        const rTxt = (rIn+rOut)/2;
+        txt.setAttribute("x", this.cx + rTxt*Math.cos(rad(deg)));
+        txt.setAttribute("y", this.cy + rTxt*Math.sin(rad(deg)));
+        g.appendChild(txt);
+        return g;
+    },
+
+    renderKnob() {
+        this.knobG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.knobG.setAttribute("class", "handle-group");
+        const r = this.rOuter + 22;
+        
+        // Arrows (Thorn shape)
+        const mkArr = (dStart, dEnd) => {
+            const rad = d => (d-90)*Math.PI/180;
+            const p = (R, D) => ({x:this.cx+R*Math.cos(rad(D)), y:this.cy+R*Math.sin(rad(D))});
+            const sIn=p(r-4, dStart), sOut=p(r+4, dStart), tip=p(r, dEnd);
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", `M ${sOut.x} ${sOut.y} Q ${p(r+1, (dStart+dEnd)/2).x} ${p(r+1, (dStart+dEnd)/2).y} ${tip.x} ${tip.y} Q ${p(r-1, (dStart+dEnd)/2).x} ${p(r-1, (dStart+dEnd)/2).y} ${sIn.x} ${sIn.y} Z`);
+            path.setAttribute("class", "handle-arrow");
+            return path;
+        };
+        this.knobG.appendChild(mkArr(-12, -24));
+        this.knobG.appendChild(mkArr(12, 24));
+        
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("cx", this.cx); c.setAttribute("cy", this.cy - r); c.setAttribute("r", 14);
+        c.setAttribute("class", "handle-knob");
+        c.setAttribute("fill", "url(#knobGrad)");
+        this.knobG.appendChild(c);
+        this.svg.appendChild(this.knobG);
+    },
+
+    update(idx, highlightData, isFlat) {
+        // 1. Labels (Enharmonic)
+        const idxs = [5,6,7];
+        idxs.forEach(i => {
+            const majL = document.getElementById(`lbl-major-${i}`);
+            const minL = document.getElementById(`lbl-minor-${i}`);
+            if(isFlat) {
+                if(this.flatMaj[i]) majL.textContent = this.flatMaj[i];
+                if(this.flatMin[i]) minL.textContent = this.flatMin[i];
+            } else {
+                majL.textContent = this.majNames[i];
+                minL.textContent = this.minNames[i];
+            }
+        });
+
+        // 2. Rotate
+        const rot = -idx * 30;
+        this.animateTo(rot);
+
+        // 3. Highlight
+        document.querySelectorAll('.sector').forEach(s => s.setAttribute("class", s.getAttribute("class").replace(/ highlight-\w+/g, "")));
+        
+        // Diatonic (Blue)
+        const left=(idx-1+12)%12, right=(idx+1)%12;
+        [left, idx, right].forEach(i => {
+            this.svg.querySelectorAll(`.sector[data-idx="${i}"]`).forEach(s => s.classList.add('highlight-diatonic'));
+        });
+
+        // Tritone (Yellow)
+        const tri = (idx+6)%12;
+        this.svg.querySelectorAll(`.sector[data-idx="${tri}"]`).forEach(s => s.classList.add('highlight-tritone'));
+
+        // ROOT (Red)
+        if(highlightData) {
+            const sel = `.sector-${highlightData.type}[data-idx="${highlightData.idx}"]`;
+            const el = this.svg.querySelector(sel);
+            if(el) {
+                el.classList.remove('highlight-diatonic');
+                el.classList.add('highlight-root');
+            }
+        }
+    },
+
+    animateTo(target) {
+        let cur = this.rotation;
+        let diff = (target - cur) % 360;
+        if(diff > 180) diff -= 360;
+        if(diff < -180) diff += 360;
+        this.setRotation(cur + diff);
+    },
+
+    setRotation(deg) {
+        this.rotation = deg;
+        const t = `rotate(${deg}, ${this.cx}, ${this.cy})`;
+        this.wheelG.setAttribute("transform", t);
+        this.knobG.setAttribute("transform", t);
+        document.querySelectorAll('text[data-deg]').forEach(el => {
+            const d = parseFloat(el.getAttribute('data-deg'));
+            const x = parseFloat(el.getAttribute('x'));
+            const y = parseFloat(el.getAttribute('y'));
+            el.setAttribute("transform", `rotate(${-deg}, ${x}, ${y})`);
+        });
+    },
+
+    setupDrag() {
+        let dragging=false, startAng=0, startRot=0;
+        const getAng = (e) => {
+            const r = this.svg.getBoundingClientRect();
+            const p = e.touches ? e.touches[0] : e;
+            return Math.atan2(p.clientY-r.top-this.cy, p.clientX-r.left-this.cx)*180/Math.PI;
+        };
+        const start = (e) => { dragging=true; startAng=getAng(e); startRot=this.rotation; e.preventDefault(); };
+        const move = (e) => {
+            if(!dragging) return;
+            this.setRotation(startRot + getAng(e) - startAng);
+            e.preventDefault();
+        };
+        const end = () => {
+            if(!dragging) return; dragging=false;
+            this.animateTo(Math.round(this.rotation/30)*30);
+        };
+        this.knobG.addEventListener('mousedown', start);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
+        this.knobG.addEventListener('touchstart', start);
+        window.addEventListener('touchmove', move, {passive:false});
+        window.addEventListener('touchend', end);
+    }
+};
+
+const StaffView = {
+    render(idx) {
+        // CoF Index to Sig Count: 0->0, 1->1, ... 6->6, 7->-5 ... 11->-1
+        const sigs = [0,1,2,3,4,5,6,-5,-4,-3,-2,-1];
+        const count = sigs[idx];
+        const box = document.getElementById('staffBox');
+        
+        // Simple SVG generation for Staff
+        const sharpPath = "M 4 0 v 18 m 5 -18 v 18 m -7 -6 h 10 m -10 -7 h 10"; // Simplified path
+        // Using provided paths for fidelity
+        const treble = "M 13.3 21.3 L 13.1 21.1 C 12.9 20.9 12.5 20.5 12.6 19.9 C 12.7 19.3 13.3 18.6 14.0 18.5 C 14.7 18.4 15.5 18.9 15.9 19.6 C 16.3 20.2 16.2 21.0 15.7 21.6 C 15.1 22.2 14.1 22.6 13.1 22.3 C 12.0 22.0 11.0 21.0 11.3 19.7 C 11.5 18.3 13.0 16.7 14.0 15.4 C 15.0 14.2 15.4 13.3 15.4 12.4 C 15.4 11.6 15.1 10.7 14.7 10.8 C 14.3 10.9 13.8 11.8 13.8 14.1 C 13.8 16.4 14.3 19.9 14.5 22.0 C 14.8 24.0 14.7 24.6 14.5 24.9 C 14.3 25.3 13.9 25.5 13.6 25.5 C 13.2 25.5 12.9 25.3 12.8 25.1 C 12.7 24.9 12.9 24.6 13.1 24.6 C 13.3 24.5 13.5 24.7 13.6 24.9 C 13.6 25.0 13.5 25.0 13.4 25.0 L 13.3 25.0";
+        const bass = "M 17.0 15.6 L 16.9 15.6 C 16.9 15.6 16.7 15.6 16.6 15.5 C 16.6 15.4 16.6 15.2 16.7 15.1 C 16.8 15.0 17.1 14.9 17.3 15.0 C 17.5 15.1 17.6 15.4 17.5 15.6 C 17.3 15.8 16.9 16.0 16.6 15.8 C 16.3 15.7 16.0 15.3 16.1 14.8 C 16.2 14.3 16.7 13.7 17.4 13.4 C 18.2 13.2 19.2 13.3 19.8 13.7 C 20.4 14.1 20.6 14.8 20.6 15.5 C 20.7 16.2 20.5 16.8 20.2 17.5 C 19.9 18.2 19.5 18.8 18.8 19.3 C 18.2 19.9 17.4 20.3 16.9 20.5 L 16.5 20.7";
+        
+        let h = `<svg viewBox="0 0 100 80"><g transform="scale(3)">`;
+        
+        // Lines
+        for(let i=0;i<5;i++) h+=`<line x1="2" y1="${5+i*2}" x2="30" y2="${5+i*2}" stroke="#888" stroke-width="0.2"/>`;
+        for(let i=0;i<5;i++) h+=`<line x1="2" y1="${17+i*2}" x2="30" y2="${17+i*2}" stroke="#888" stroke-width="0.2"/>`;
+        
+        // Clefs
+        h+=`<path d="${treble}" transform="translate(-8,-8) scale(0.8)" fill="none" stroke="currentColor" stroke-width="0.3"/>`;
+        h+=`<path d="${bass}" transform="translate(-11,-10) scale(0.8)" fill="none" stroke="currentColor" stroke-width="0.3"/>`;
+        h+=`<circle cx="10.8" cy="4.2" r="0.4" fill="currentColor"/><circle cx="10.8" cy="5.2" r="0.4" fill="currentColor"/>`; // Bass dots
+        
+        // Accs
+        const isSharp = count > 0;
+        const num = Math.abs(count);
+        const shape = isSharp 
+            ? '<path d="M1.5 0v5M3.5-0.5v5M1 1.5h3M1 3.5h3" stroke="currentColor" stroke-width="0.3" fill="none"/>'
+            : '<path d="M1 0v4.5c0 1 1.5 0 1.5-1s-1.5-1-1.5-1" stroke="currentColor" stroke-width="0.3" fill="none"/>';
+        
+        // Offsets
+        const posS_T = [2, 5, 1, 4, 7, 3, 6]; // Top down positions relative
+        const posS_B = [4, 7, 3, 6, 9, 5, 8];
+        const posF_T = [6, 3, 7, 4, 8, 5, 9];
+        const posF_B = [8, 5, 9, 6, 10, 7, 11];
+        
+        const pt = isSharp ? posS_T : posF_T;
+        const pb = isSharp ? posS_B : posF_B;
+
+        for(let i=0; i<num; i++) {
+            h+=`<g transform="translate(${9+i*2.2}, ${pt[i]}) scale(0.6)">${shape}</g>`;
+            h+=`<g transform="translate(${9+i*2.2}, ${pb[i]+12}) scale(0.6)">${shape}</g>`;
+        }
+
+        h += `</g></svg>`;
+        box.innerHTML = h;
+    }
+};
+
+// =======================================================
+// 5. APP CONTROLLER
+// =======================================================
+const engine = new TheoryEngine();
+
+const app = {
+    mode: 'keyboard',
+    rows: [
+        { key: "Ebm", chord: "Ebm" },
+        { key: "Ebm", chord: "Bbm7" },
+        { key: "Gb",  chord: "BM7" },
+        { key: "Gb",  chord: "Abm6" },
+        { key: "Gb",  chord: "Bbm7" },
+        { key: "Gb",  chord: "Ebm7" },
+        { key: "Gb",  chord: "Abm7" },
+        { key: "Gb",  chord: "Db7" },
+        { key: "Gb",  chord: "GbM7" },
+        { key: "Ebm", chord: "Fm7b5" },
+        { key: "Ebm", chord: "Bb7b9" }
+    ],
+
+    init() {
+        KeyboardUI.init();
+        CoFUI.init();
+        this.renderTable();
+        this.highlightRow(0);
+    },
+
+    toggleView(m) {
+        this.mode = m;
+        document.getElementById('view-keyboard').className = m==='keyboard'?'active':'';
+        document.getElementById('view-cof').className = m==='cof'?'active':'';
+        document.getElementById('btnModeKey').className = m==='keyboard'?'btn active':'btn';
+        document.getElementById('btnModeCoF').className = m==='cof'?'btn active':'btn';
+        
+        const sel = document.querySelector('.selected-row');
+        if(sel) {
+            const idx = parseInt(sel.cells[0].innerText)-1;
+            this.highlightRow(idx);
+        }
+    },
+
+    renderTable() {
+        const tb = document.querySelector('tbody');
+        tb.innerHTML = '';
+        this.rows.forEach((r,i) => {
+            const a = engine.analyze(r.key, r.chord);
+            const tr = document.createElement('tr');
+            tr.onclick = () => this.highlightRow(i);
+            tr.innerHTML = `
+                <td>${i+1}</td>
+                <td class="col-key"><div class="editable-cell" contenteditable="true" onblur="app.upd(${i},'key',this.innerText)">${r.key}</div></td>
+                <td class="col-chord"><div class="editable-cell" contenteditable="true" onblur="app.upd(${i},'chord',this.innerText)">${r.chord}</div></td>
+                <td>${a.roman}</td><td>${a.func}</td><td>${a.scale}</td>
+                <td class="mono-col">${a.tones.join(' ')}</td><td>-</td>
+                <td><button class="btn-action" onclick="app.ins(${i})">+</button> <button class="btn-action" onclick="app.del(${i})">-</button></td>
+            `;
+            tb.appendChild(tr);
+        });
+    },
+
+    upd(i,f,v) { this.rows[i][f]=v; this.renderTable(); this.highlightRow(i); },
+    ins(i) { this.rows.splice(i+1,0,{key:this.rows[i].key, chord:""}); this.renderTable(); },
+    del(i) { if(this.rows.length>1) this.rows.splice(i,1); else this.rows[0].chord=""; this.renderTable(); },
+
+    highlightRow(i) {
+        document.querySelectorAll('tr').forEach(r => r.classList.remove('selected-row'));
+        const rows = document.querySelectorAll('tbody tr');
+        if(rows[i]) rows[i].classList.add('selected-row');
+        
+        const r = this.rows[i];
+        const a = engine.analyze(r.key, r.chord);
+        
+        if(this.mode === 'keyboard') {
+            KeyboardUI.update(a.kbMap);
+        } else {
+            const keyPos = CoFLogic.getKeyCoordinates(a.kSemi, a.kMinor);
+            const chdPos = CoFLogic.getChordHighlight(a.cSemi, a.cMinor);
+            
+            // Bold Text Mode
+            const w = document.getElementById('circleWrapper');
+            w.className = 'circle-wrapper ' + (a.kMinor ? 'mode-minor' : 'mode-major');
+            
+            CoFUI.update(keyPos.idx, chdPos, a.isFlat);
+            StaffView.render(keyPos.idx);
+        }
+    },
+
+    jumpToCoF(idx) {
+        const rot = -idx * 30;
+        CoFUI.animateTo(rot);
+    },
+    
+    copyTSV() {
+        let t = "Key\tChord\n";
+        this.rows.forEach(r => t+=`${r.key}\t${r.chord}\n`);
+        navigator.clipboard.writeText(t);
+        alert("Copied!");
+    }
+};
+
+app.init();
+</script>
+</body>
+</html>

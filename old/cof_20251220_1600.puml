@@ -1,0 +1,30 @@
+@startuml
+title EnharmonicStateMachine (Strict Step Logic)
+skinparam state {
+  BackgroundColor White
+  BorderColor Black
+  ArrowColor Black
+}
+
+state "STATE_SHARP\n(Display: B, F#, C#)" as Sharp
+state "STATE_FLAT\n(Display: Cb, Gb, Db)" as Flat
+
+[*] --> Sharp : Init (Key: C / Step 0)
+
+' 遷移: シャープからフラットへ
+Sharp --> Flat : <b>EVENT_STEP_CHANGED</b>\n[currentStep < -4]\n(C# -> Ab の範囲を抜けた後)
+note on link
+  <b>Transition Action:</b> isSharpMode = false
+end note
+
+' 遷移: フラットからシャープへ
+Flat --> Sharp : <b>EVENT_STEP_CHANGED</b>\n[currentStep > 4]\n(Cb -> E の範囲を抜けた後)
+note on link
+  <b>Transition Action:</b> isSharpMode = true
+end note
+
+' Entry Actions
+Sharp : <b>Entry Action:</b> Rewrite labels to B, F#, C#
+Flat : <b>Entry Action:</b> Rewrite labels to Cb, Gb, Db
+
+@enduml

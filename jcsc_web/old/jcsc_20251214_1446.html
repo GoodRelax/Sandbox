@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JCSC - Jazz Chord-Scale Calculator</title>
+<style>
+    /* Reset & Base */
+    body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+    h1 { text-align: center; color: #444; margin-bottom: 20px; font-weight: 600; font-size: 1.5rem; }
+
+    /* Layout: Full Screen Width */
+    .container { 
+        width: 96%; 
+        max-width: none; 
+        margin: 0 auto; 
+        background: white; 
+        padding: 20px; 
+        border-radius: 8px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+    }
+    
+    .intro { font-size: 0.9em; color: #666; margin-bottom: 20px; text-align: center; }
+
+    /* Controls */
+    .controls { margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+    button { padding: 8px 16px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background 0.2s; }
+    button:hover { background: #0b5ed7; }
+    button.secondary { background: #6c757d; }
+    button.secondary:hover { background: #5c636a; }
+
+    /* Table */
+    .table-wrapper { overflow-x: auto; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 30px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
+    th, td { padding: 12px 10px; text-align: center; white-space: nowrap; border-bottom: 1px solid #dee2e6; }
+    th { background: #2c3e50; color: white; position: sticky; top: 0; font-weight: 500; z-index: 10; }
+    tr:nth-child(even) { background: #f8f9fa; }
+    tr:hover { background: #e9ecef; cursor: pointer; }
+    .selected-row { background: #e3f2fd !important; }
+    
+    /* Input Cells */
+    td input { width: 100%; min-width: 60px; padding: 6px; box-sizing: border-box; border: 1px solid transparent; background: transparent; text-align: center; font-weight: bold; color: #495057; font-size: 15px; }
+    td input:focus { border-color: #86b7fe; background: white; border-radius: 4px; outline: none; }
+    td input.key-input { color: #0d6efd; } /* キー入力は青文字で区別 */
+
+    /* Keyboard Section */
+    .keyboard-section { border-top: 1px solid #dee2e6; padding-top: 20px; }
+    .keyboard-container { text-align: center; user-select: none; overflow-x: auto; padding-bottom: 10px; display: flex; justify-content: center; }
+    
+    /* 3. 鍵盤表示エリア (3オクターブ分確保) */
+    .keyboard { display: flex; position: relative; height: 160px; padding-top: 10px; width: max-content; }
+    
+    /* Keys */
+    .key { 
+        border: 1px solid #bbb; 
+        border-radius: 0 0 4px 4px; 
+        position: relative; 
+        z-index: 1; 
+        transition: background 0.1s; 
+        display: flex;
+        justify-content: center; 
+    }
+    .key.white { width: 44px; height: 150px; background: white; }
+    .key.black { width: 30px; height: 95px; background: #333; margin-left: -15px; margin-right: -15px; z-index: 2; border-radius: 0 0 3px 3px; }
+    
+    /* 1. コードトーンの色指定 (白鍵・黒鍵で統一) */
+    .key.white.chord-bg { background: #b3e5fc !important; } 
+    .key.black.chord-bg { background: #b3e5fc !important; border-color: #81d4fa; } /* 黒鍵も同じ色。境界が見えるようボーダー調整 */
+
+    .key-label { position: absolute; bottom: 5px; width: 100%; text-align: center; font-size: 10px; color: #999; pointer-events: none; }
+    .key.black .key-label { display: none; }
+
+    /* 2. スケールマーク（ドット）の統一 */
+    .dot {
+        position: absolute;
+        width: 14px;  /* 白鍵・黒鍵共通サイズ */
+        height: 14px;
+        border-radius: 50%;
+        bottom: 30px; 
+        z-index: 5;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.8);
+    }
+    .key.black .dot {
+        bottom: 15px; 
+        /* 黒鍵用サイズ指定を削除し、共通設定を適用 */
+    }
+
+    /* 5. ドットの色使い */
+    .dot.root   { background: #d50000; transform: scale(1.2); } /* ルート: 赤 */
+    .dot.guide  { background: #ef5350; } /* ガイド: 赤と薄赤の中間 */
+    .dot.avoid  { background: #ff9800; } /* アボイド: オレンジ */
+    .dot.scale  { background: #ffcdd2; } /* その他: 薄赤 */
+
+    /* Legend */
+    .legend { text-align: center; margin-top: 15px; font-size: 13px; color: #555; display: flex; justify-content: center; gap: 25px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    
+    .l-box { width: 16px; height: 16px; border: 1px solid #ccc; display: inline-block; vertical-align: middle; }
+    .l-bg-chord { background: #b3e5fc; }
+    
+    .l-circle { width: 14px; height: 14px; border-radius: 50%; display: inline-block; vertical-align: middle; border: 1px solid rgba(0,0,0,0.1); }
+    .l-root  { background: #d50000; }
+    .l-guide { background: #ef5350; }
+    .l-avoid { background: #ff9800; }
+    .l-scale { background: #ffcdd2; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>JCSC - Jazz Chord-Scale Calculator</h1>
+    
+    <div class="controls">
+        <div style="font-size:0.9em; color:#666;">
+            <b>Tips:</b> Key列は "C" (Major) や "Gm" (Minor) のように入力してください。
+        </div>
+        <div style="flex-grow:1"></div>
+        <button class="secondary" onclick="app.addRow()">+ Add Row</button>
+        <button onclick="app.recalcAll()">Recalculate</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="mainTable">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">#</th>
+                    <th style="width: 80px;">Key</th>
+                    <th style="width: 100px;">Chord</th>
+                    <th>Degree</th>
+                    <th>Func</th>
+                    <th>Scale Name</th>
+                    <th>Chord Tones</th>
+                    <th>Guide Tones</th>
+                    <th>Avoid Notes</th>
+                    <th>Scale Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <div class="keyboard-section">
+        <h3 style="text-align:center; margin-bottom:10px; font-weight:600;">Keyboard Visualization (3 Octaves)</h3>
+        
+        <div class="keyboard-container">
+            <div id="keyboard" class="keyboard"></div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item"><span class="l-box l-bg-chord"></span> Chord Tone (Back)</div>
+            <div style="width: 1px; height: 20px; background: #ddd; margin: 0 10px;"></div>
+            <div class="legend-item"><span class="l-circle l-root"></span> Root</div>
+            <div class="legend-item"><span class="l-circle l-guide"></span> Guide Tone</div>
+            <div class="legend-item"><span class="l-circle l-scale"></span> Other Scale</div>
+            <div class="legend-item"><span class="l-circle l-avoid"></span> Avoid Note</div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Embedded Database from Excel (MasterTables)
+const DB = {"notes": [{"NoteName": "Ebbb", "BaseDegree": "2", "SemitonePosition": "1", "AccidentalValue": "-3"}, {"NoteName": "Fbbb", "BaseDegree": "3", "SemitonePosition": "2", "AccidentalValue": "-3"}, {"NoteName": "Gbbb", "BaseDegree": "4", "SemitonePosition": "4", "AccidentalValue": "-3"}, {"NoteName": "Abbb", "BaseDegree": "5", "SemitonePosition": "6", "AccidentalValue": "-3"}, {"NoteName": "Bbbb", "BaseDegree": "6", "SemitonePosition": "8", "AccidentalValue": "-3"}, {"NoteName": "Cbbb", "BaseDegree": "0", "SemitonePosition": "9", "AccidentalValue": "-3"}, {"NoteName": "Dbbb", "BaseDegree": "1", "SemitonePosition": "11", "AccidentalValue": "-3"}, {"NoteName": "Dbb", "BaseDegree": "1", "SemitonePosition": "0", "AccidentalValue": "-2"}, {"NoteName": "Ebb", "BaseDegree": "2", "SemitonePosition": "2", "AccidentalValue": "-2"}, {"NoteName": "Fbb", "BaseDegree": "3", "SemitonePosition": "3", "AccidentalValue": "-2"}, {"NoteName": "Gbb", "BaseDegree": "4", "SemitonePosition": "5", "AccidentalValue": "-2"}, {"NoteName": "Abb", "BaseDegree": "5", "SemitonePosition": "7", "AccidentalValue": "-2"}, {"NoteName": "Bbb", "BaseDegree": "6", "SemitonePosition": "9", "AccidentalValue": "-2"}, {"NoteName": "Cbb", "BaseDegree": "0", "SemitonePosition": "10", "AccidentalValue": "-2"}, {"NoteName": "Db", "BaseDegree": "1", "SemitonePosition": "1", "AccidentalValue": "-1"}, {"NoteName": "Eb", "BaseDegree": "2", "SemitonePosition": "3", "AccidentalValue": "-1"}, {"NoteName": "Fb", "BaseDegree": "3", "SemitonePosition": "4", "AccidentalValue": "-1"}, {"NoteName": "Gb", "BaseDegree": "4", "SemitonePosition": "6", "AccidentalValue": "-1"}, {"NoteName": "Ab", "BaseDegree": "5", "SemitonePosition": "8", "AccidentalValue": "-1"}, {"NoteName": "Bb", "BaseDegree": "6", "SemitonePosition": "10", "AccidentalValue": "-1"}, {"NoteName": "Cb", "BaseDegree": "0", "SemitonePosition": "11", "AccidentalValue": "-1"}, {"NoteName": "C", "BaseDegree": "0", "SemitonePosition": "0", "AccidentalValue": "0"}, {"NoteName": "D", "BaseDegree": "1", "SemitonePosition": "2", "AccidentalValue": "0"}, {"NoteName": "E", "BaseDegree": "2", "SemitonePosition": "4", "AccidentalValue": "0"}, {"NoteName": "F", "BaseDegree": "3", "SemitonePosition": "5", "AccidentalValue": "0"}, {"NoteName": "G", "BaseDegree": "4", "SemitonePosition": "7", "AccidentalValue": "0"}, {"NoteName": "A", "BaseDegree": "5", "SemitonePosition": "9", "AccidentalValue": "0"}, {"NoteName": "B", "BaseDegree": "6", "SemitonePosition": "11", "AccidentalValue": "0"}, {"NoteName": "C#", "BaseDegree": "0", "SemitonePosition": "1", "AccidentalValue": "1"}, {"NoteName": "D#", "BaseDegree": "1", "SemitonePosition": "3", "AccidentalValue": "1"}, {"NoteName": "E#", "BaseDegree": "2", "SemitonePosition": "5", "AccidentalValue": "1"}, {"NoteName": "F#", "BaseDegree": "3", "SemitonePosition": "6", "AccidentalValue": "1"}, {"NoteName": "G#", "BaseDegree": "4", "SemitonePosition": "8", "AccidentalValue": "1"}, {"NoteName": "A#", "BaseDegree": "5", "SemitonePosition": "10", "AccidentalValue": "1"}, {"NoteName": "B#", "BaseDegree": "6", "SemitonePosition": "0", "AccidentalValue": "1"}, {"NoteName": "Cx", "BaseDegree": "0", "SemitonePosition": "2", "AccidentalValue": "2"}, {"NoteName": "Dx", "BaseDegree": "1", "SemitonePosition": "4", "AccidentalValue": "2"}, {"NoteName": "Ex", "BaseDegree": "2", "SemitonePosition": "6", "AccidentalValue": "2"}, {"NoteName": "Fx", "BaseDegree": "3", "SemitonePosition": "7", "AccidentalValue": "2"}, {"NoteName": "Gx", "BaseDegree": "4", "SemitonePosition": "9", "AccidentalValue": "2"}, {"NoteName": "Ax", "BaseDegree": "5", "SemitonePosition": "11", "AccidentalValue": "2"}, {"NoteName": "Bx", "BaseDegree": "6", "SemitonePosition": "1", "AccidentalValue": "2"}], "intervals": [{"IntervalID": "P1", "IntervalName": "Perfect 1st", "DeltaSemitone": "0", "DeltaDegree": "0", "RomanNumeralBase": "I"}, {"IntervalID": "m2", "IntervalName": "Minor 2nd", "DeltaSemitone": "1", "DeltaDegree": "1", "RomanNumeralBase": "bII"}, {"IntervalID": "M2", "IntervalName": "Major 2nd", "DeltaSemitone": "2", "DeltaDegree": "1", "RomanNumeralBase": "II"}, {"IntervalID": "m3", "IntervalName": "Minor 3rd", "DeltaSemitone": "3", "DeltaDegree": "2", "RomanNumeralBase": "bIII"}, {"IntervalID": "M3", "IntervalName": "Major 3rd", "DeltaSemitone": "4", "DeltaDegree": "2", "RomanNumeralBase": "III"}, {"IntervalID": "P4", "IntervalName": "Perfect 4th", "DeltaSemitone": "5", "DeltaDegree": "3", "RomanNumeralBase": "IV"}, {"IntervalID": "A4", "IntervalName": "Augmented 4th", "DeltaSemitone": "6", "DeltaDegree": "3", "RomanNumeralBase": "#IV"}, {"IntervalID": "d5", "IntervalName": "Diminished 5th", "DeltaSemitone": "6", "DeltaDegree": "4", "RomanNumeralBase": "bV"}, {"IntervalID": "P5", "IntervalName": "Perfect 5th", "DeltaSemitone": "7", "DeltaDegree": "4", "RomanNumeralBase": "V"}, {"IntervalID": "A5", "IntervalName": "Augmented 5th", "DeltaSemitone": "8", "DeltaDegree": "4", "RomanNumeralBase": "#V"}, {"IntervalID": "m6", "IntervalName": "Minor 6th", "DeltaSemitone": "8", "DeltaDegree": "5", "RomanNumeralBase": "bVI"}, {"IntervalID": "M6", "IntervalName": "Major 6th", "DeltaSemitone": "9", "DeltaDegree": "5", "RomanNumeralBase": "VI"}, {"IntervalID": "d7", "IntervalName": "Diminished 7th", "DeltaSemitone": "9", "DeltaDegree": "6", "RomanNumeralBase": "bbVII"}, {"IntervalID": "m7", "IntervalName": "Minor 7th", "DeltaSemitone": "10", "DeltaDegree": "6", "RomanNumeralBase": "bVII"}, {"IntervalID": "M7", "IntervalName": "Major 7th", "DeltaSemitone": "11", "DeltaDegree": "6", "RomanNumeralBase": "VII"}, {"IntervalID": "A1", "IntervalName": "Augmented 1st", "DeltaSemitone": "1", "DeltaDegree": "0", "RomanNumeralBase": "#I"}], "chords": [{"ChordSymbol": "m", "IntervalsStructure": "P1, m3, P5", "GuideToneIntervals": "m3", "RomanSuffix": "m"}, {"ChordSymbol": "dim", "IntervalsStructure": "P1, m3, d5", "GuideToneIntervals": "m3, d5", "RomanSuffix": "dim"}, {"ChordSymbol": "aug", "IntervalsStructure": "P1, M3, A5", "GuideToneIntervals": "M3, A5", "RomanSuffix": "aug"}, {"ChordSymbol": "sus4", "IntervalsStructure": "P1, P4, P5", "GuideToneIntervals": "P4", "RomanSuffix": "sus4"}, {"ChordSymbol": "M7", "IntervalsStructure": "P1, M3, P5, M7", "GuideToneIntervals": "M3, M7", "RomanSuffix": "M7"}, {"ChordSymbol": "M6", "IntervalsStructure": "P1, M3, P5, M6", "GuideToneIntervals": "M3, M6", "RomanSuffix": "6"}, {"ChordSymbol": "M9", "IntervalsStructure": "P1, M3, P5, M7, 9", "GuideToneIntervals": "M3, M7, 9", "RomanSuffix": "M9"}, {"ChordSymbol": "M69", "IntervalsStructure": "P1, M3, P5, M6, 9", "GuideToneIntervals": "M3, M6, 9", "RomanSuffix": "69"}, {"ChordSymbol": "M7#11", "IntervalsStructure": "P1, M3, P5, M7, #11", "GuideToneIntervals": "M3, M7, #11", "RomanSuffix": "M7#11"}, {"ChordSymbol": "M13", "IntervalsStructure": "P1, M3, P5, M7, 9, 13", "GuideToneIntervals": "M3, M7, 13", "RomanSuffix": "M13"}, {"ChordSymbol": "m7", "IntervalsStructure": "P1, m3, P5, m7", "GuideToneIntervals": "m3, m7", "RomanSuffix": "m7"}, {"ChordSymbol": "m6", "IntervalsStructure": "P1, m3, P5, M6", "GuideToneIntervals": "m3, M6", "RomanSuffix": "m6"}, {"ChordSymbol": "mM7", "IntervalsStructure": "P1, m3, P5, M7", "GuideToneIntervals": "m3, M7", "RomanSuffix": "m\u0394"}, {"ChordSymbol": "m9", "IntervalsStructure": "P1, m3, P5, m7, 9", "GuideToneIntervals": "m3, m7, 9", "RomanSuffix": "m9"}, {"ChordSymbol": "m11", "IntervalsStructure": "P1, m3, P5, m7, 9, 11", "GuideToneIntervals": "m3, m7, 11", "RomanSuffix": "m11"}, {"ChordSymbol": "m7b5", "IntervalsStructure": "P1, m3, d5, m7", "GuideToneIntervals": "m3, m7", "RomanSuffix": "m7b5"}, {"ChordSymbol": "dim7", "IntervalsStructure": "P1, m3, d5, d7", "GuideToneIntervals": "m3, d7", "RomanSuffix": "dim7"}, {"ChordSymbol": "7", "IntervalsStructure": "P1, M3, P5, m7", "GuideToneIntervals": "M3, m7", "RomanSuffix": "7"}, {"ChordSymbol": "7", "IntervalsStructure": "P1, M3, P5, m7", "GuideToneIntervals": "M3, m7", "RomanSuffix": "7"}, {"ChordSymbol": "9", "IntervalsStructure": "P1, M3, P5, m7, 9", "GuideToneIntervals": "M3, m7, 9", "RomanSuffix": "9"}, {"ChordSymbol": "13", "IntervalsStructure": "P1, M3, P5, m7, 9, 13", "GuideToneIntervals": "M3, m7, 13", "RomanSuffix": "13"}, {"ChordSymbol": "7b9", "IntervalsStructure": "P1, M3, P5, m7, b9", "GuideToneIntervals": "M3, m7, b9", "RomanSuffix": "7b9"}, {"ChordSymbol": "7#9", "IntervalsStructure": "P1, M3, P5, m7, #9", "GuideToneIntervals": "M3, m7, #9", "RomanSuffix": "7#9"}, {"ChordSymbol": "7#11", "IntervalsStructure": "P1, M3, P5, m7, #11", "GuideToneIntervals": "M3, m7, #11", "RomanSuffix": "7#11"}, {"ChordSymbol": "7b13", "IntervalsStructure": "P1, M3, P5, m7, b13", "GuideToneIntervals": "M3, m7, b13", "RomanSuffix": "7b13"}, {"ChordSymbol": "7alt", "IntervalsStructure": "P1, M3, d5, m7, b9, #9, b13", "GuideToneIntervals": "M3, m7, b9", "RomanSuffix": "7alt"}, {"ChordSymbol": "7sus4", "IntervalsStructure": "P1, P4, P5, m7", "GuideToneIntervals": "P4, m7", "RomanSuffix": "7sus4"}], "scales": [{"ScaleName": "Ionian", "IntervalsStructure": "P1, M2, M3, P4, P5, M6, M7", "AvoidNoteIntervals": "P4"}, {"ScaleName": "Dorian", "IntervalsStructure": "P1, M2, m3, P4, P5, M6, m7", "AvoidNoteIntervals": null}, {"ScaleName": "Phrygian", "IntervalsStructure": "P1, m2, m3, P4, P5, m6, m7", "AvoidNoteIntervals": "m2, m6"}, {"ScaleName": "Lydian", "IntervalsStructure": "P1, M2, M3, A4, P5, M6, M7", "AvoidNoteIntervals": null}, {"ScaleName": "Mixolydian", "IntervalsStructure": "P1, M2, M3, P4, P5, M6, m7", "AvoidNoteIntervals": "P4"}, {"ScaleName": "Aeolian", "IntervalsStructure": "P1, M2, m3, P4, P5, m6, m7", "AvoidNoteIntervals": "m6"}, {"ScaleName": "Locrian", "IntervalsStructure": "P1, m2, m3, P4, d5, m6, m7", "AvoidNoteIntervals": "m2"}, {"ScaleName": "Melodic Minor", "IntervalsStructure": "P1, M2, m3, P4, P5, M6, M7", "AvoidNoteIntervals": null}, {"ScaleName": "Dorian b2", "IntervalsStructure": "P1, m2, m3, P4, P5, M6, m7", "AvoidNoteIntervals": null}, {"ScaleName": "Lydian Augmented", "IntervalsStructure": "P1, M2, M3, A4, A5, M6, M7", "AvoidNoteIntervals": null}, {"ScaleName": "Lydian Dominant", "IntervalsStructure": "P1, M2, M3, A4, P5, M6, m7", "AvoidNoteIntervals": null}, {"ScaleName": "Mixolydian b6", "IntervalsStructure": "P1, M2, M3, P4, P5, m6, m7", "AvoidNoteIntervals": "P4"}, {"ScaleName": "Locrian #2", "IntervalsStructure": "P1, M2, m3, P4, d5, m6, m7", "AvoidNoteIntervals": null}, {"ScaleName": "Altered", "IntervalsStructure": "P1, m2, m3, M3, d5, m6, m7", "AvoidNoteIntervals": null}, {"ScaleName": "W-H Diminished", "IntervalsStructure": "P1, M2, m3, P4, d5, m6, M6, M7", "AvoidNoteIntervals": null}, {"ScaleName": "H-W Diminished", "IntervalsStructure": "P1, m2, m3, M3, A4, P5, M6, m7", "AvoidNoteIntervals": null}, {"ScaleName": "Whole Tone", "IntervalsStructure": "P1, M2, M3, A4, A5, m7", "AvoidNoteIntervals": null}, {"ScaleName": "Bebop Dominant", "IntervalsStructure": "P1, M2, M3, P4, P5, M6, m7, M7", "AvoidNoteIntervals": "M7"}], "rules": [{"KeyType": "Major", "DegreeIntervalID": "P1", "ChordSymbol": "M7", "ScaleName": "Ionian", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "P1", "ChordSymbol": "M6", "ScaleName": "Ionian", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "P1", "ChordSymbol": "M7", "ScaleName": "Lydian", "HarmonicFunction": "T", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "m2", "ChordSymbol": "M7", "ScaleName": "Lydian", "HarmonicFunction": "SD", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "M2", "ChordSymbol": "m7", "ScaleName": "Dorian", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "M2", "ChordSymbol": "7", "ScaleName": "Mixolydian", "HarmonicFunction": "D", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "m3", "ChordSymbol": "dim7", "ScaleName": "W-H Diminished", "HarmonicFunction": "D", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "m3", "ChordSymbol": "m7", "ScaleName": "Dorian", "HarmonicFunction": "T", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "M3", "ChordSymbol": "m7", "ScaleName": "Phrygian", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "P4", "ChordSymbol": "M7", "ScaleName": "Lydian", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "P4", "ChordSymbol": "M6", "ScaleName": "Lydian", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "P4", "ChordSymbol": "m7", "ScaleName": "Dorian", "HarmonicFunction": "SD", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "d5", "ChordSymbol": "m7b5", "ScaleName": "Locrian", "HarmonicFunction": "D", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "P5", "ChordSymbol": "7", "ScaleName": "Mixolydian", "HarmonicFunction": "D", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "P5", "ChordSymbol": "7alt", "ScaleName": "Altered", "HarmonicFunction": "D", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "P5", "ChordSymbol": "m7", "ScaleName": "Dorian", "HarmonicFunction": "D", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "A5", "ChordSymbol": "dim7", "ScaleName": "W-H Diminished", "HarmonicFunction": "D", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "m6", "ChordSymbol": "M7", "ScaleName": "Lydian Augmented", "HarmonicFunction": "T", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "M6", "ChordSymbol": "m7", "ScaleName": "Aeolian", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "m7", "ChordSymbol": "M7", "ScaleName": "Lydian", "HarmonicFunction": "SD", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "m7", "ChordSymbol": "7", "ScaleName": "Lydian Dominant", "HarmonicFunction": "SD", "UsageType": "Alt"}, {"KeyType": "Major", "DegreeIntervalID": "VII", "ChordSymbol": "m7b5", "ScaleName": "Locrian", "HarmonicFunction": "D", "UsageType": "Main"}, {"KeyType": "Major", "DegreeIntervalID": "VII", "ChordSymbol": "dim7", "ScaleName": "W-H Diminished", "HarmonicFunction": "D", "UsageType": "Alt"}, {"KeyType": "Minor", "DegreeIntervalID": "P1", "ChordSymbol": "m7", "ScaleName": "Melodic Minor", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "P1", "ChordSymbol": "m6", "ScaleName": "Melodic Minor", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "P1", "ChordSymbol": "mM7", "ScaleName": "Melodic Minor", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "M2", "ChordSymbol": "m7b5", "ScaleName": "Locrian #2", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "m3", "ChordSymbol": "M7#5", "ScaleName": "Lydian Augmented", "HarmonicFunction": "T", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "P4", "ChordSymbol": "7", "ScaleName": "Lydian Dominant", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "P5", "ChordSymbol": "7", "ScaleName": "Mixolydian b6", "HarmonicFunction": "D", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "P5", "ChordSymbol": "7alt", "ScaleName": "Altered", "HarmonicFunction": "D", "UsageType": "Alt"}, {"KeyType": "Minor", "DegreeIntervalID": "m6", "ChordSymbol": "m7b5", "ScaleName": "Locrian #2", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "m7", "ChordSymbol": "7", "ScaleName": "Mixolydian", "HarmonicFunction": "SD", "UsageType": "Main"}, {"KeyType": "Minor", "DegreeIntervalID": "M7", "ChordSymbol": "dim7", "ScaleName": "W-H Diminished", "HarmonicFunction": "D", "UsageType": "Main"}]};
+
+class TheoryEngine {
+    constructor() {
+        this.noteLookup = {};
+        if(DB.notes) {
+            DB.notes.forEach(n => {
+                if(!n.BaseDegree || !n.SemitonePosition) return;
+                const key = `${n.BaseDegree}-${n.SemitonePosition}`;
+                const current = this.noteLookup[key];
+                if (!current || Math.abs(parseInt(n.AccidentalValue || 0)) < Math.abs(parseInt(current.AccidentalValue || 0))) {
+                    this.noteLookup[key] = n;
+                }
+            });
+        }
+        this.intervals = {};
+        if(DB.intervals) DB.intervals.forEach(i => this.intervals[i.IntervalID] = i);
+        this.chords = {};
+        if(DB.chords) DB.chords.forEach(c => this.chords[c.ChordSymbol] = c);
+        this.scales = {};
+        if(DB.scales) DB.scales.forEach(s => this.scales[s.ScaleName] = s);
+    }
+
+    parseNote(noteStr) {
+        if (!noteStr) return null;
+        noteStr = noteStr.trim();
+        const match = noteStr.match(/^([A-G])(b+|#+|x)?$/);
+        if (!match) return null;
+        const exact = DB.notes.find(n => n.NoteName === noteStr);
+        if (exact) return exact;
+        return null;
+    }
+
+    splitChord(input) {
+        if (!input) return { root: null, quality: null };
+        input = input.trim();
+        const match = input.match(/^([A-G](?:b+|#+|x)?)(.*)$/);
+        if (!match) return { root: null, quality: null };
+        return { root: match[1], quality: match[2] };
+    }
+
+    getNoteFromInterval(rootNote, intervalId) {
+        const interval = this.intervals[intervalId];
+        if (!interval || !rootNote) return { name: "?", semi: 0 };
+        const rBase = parseInt(rootNote.BaseDegree);
+        const rSemi = parseInt(rootNote.SemitonePosition);
+        const dDeg = parseInt(interval.DeltaDegree);
+        const dSemi = parseInt(interval.DeltaSemitone);
+        const newBase = (rBase + dDeg) % 7;
+        const newSemi = (rSemi + dSemi + 12) % 12; 
+        let match = DB.notes.find(n => 
+            parseInt(n.BaseDegree) === newBase && 
+            parseInt(n.SemitonePosition) === newSemi
+        );
+        if (!match) match = DB.notes.find(n => parseInt(n.SemitonePosition) === newSemi);
+        return {
+            name: match ? match.NoteName : "?",
+            semi: newSemi
+        };
+    }
+
+    getInterval(note1, note2) {
+        const dDeg = (parseInt(note2.BaseDegree) - parseInt(note1.BaseDegree) + 7) % 7;
+        const dSemi = (parseInt(note2.SemitonePosition) - parseInt(note1.SemitonePosition) + 12) % 12;
+        const match = DB.intervals.find(i => 
+            parseInt(i.DeltaDegree) === dDeg && 
+            parseInt(i.DeltaSemitone) === dSemi
+        );
+        return match ? match.IntervalID : null;
+    }
+
+    analyze(keyStr, chordInput) {
+        const res = {
+            input: chordInput,
+            isValid: false,
+            roman: "-",
+            func: "-",
+            scaleName: "-",
+            chordTonesStr: "",
+            guideTonesStr: "",
+            avoidNotesStr: "",
+            scaleTonesStr: "",
+            keyboardMap: {} 
+        };
+
+        // 4. Parse Key per row
+        let keyRootStr = "C";
+        let keyType = "Major";
+        
+        if (keyStr) {
+            keyStr = keyStr.trim();
+            if (keyStr.endsWith("m")) {
+                keyType = "Minor";
+                keyRootStr = keyStr.substring(0, keyStr.length - 1);
+            } else {
+                keyRootStr = keyStr;
+            }
+        }
+
+        const keyRoot = this.parseNote(keyRootStr);
+        const parts = this.splitChord(chordInput);
+        const chordRoot = this.parseNote(parts.root);
+
+        if (!keyRoot || !chordRoot) return res;
+        res.isValid = true;
+
+        const rootIntervalId = this.getInterval(keyRoot, chordRoot);
+        if (!rootIntervalId) { res.roman = "Err:Int"; return res; }
+
+        const rule = DB.rules.find(r => 
+            r.KeyType === keyType && 
+            r.DegreeIntervalID === rootIntervalId && 
+            r.ChordSymbol === parts.quality
+        );
+
+        if (!rule) {
+            res.roman = `${rootIntervalId}`;
+            res.scaleName = "(No Rule)";
+            return res;
+        }
+
+        res.roman = rule.DegreeIntervalID + (rule.HarmonicFunction ? ` (${rule.HarmonicFunction})` : "");
+        res.func = rule.HarmonicFunction || "";
+        res.scaleName = rule.ScaleName;
+
+        const scaleDef = this.scales[rule.ScaleName];
+        const chordDef = this.chords[parts.quality];
+        if (!scaleDef) return res;
+
+        // Helper
+        const mapIntervals = (strList) => {
+            if (!strList) return [];
+            return String(strList).split(',').map(s => s.trim()).filter(s=>s).map(intId => {
+                const n = this.getNoteFromInterval(chordRoot, intId);
+                return { ...n, interval: intId };
+            });
+        };
+
+        const sTones = mapIntervals(scaleDef.IntervalsStructure);
+        const cTones = chordDef ? mapIntervals(chordDef.IntervalsStructure) : [];
+        const gIntervals = chordDef ? (String(chordDef.GuideToneIntervals || "").split(',').map(s=>s.trim())) : [];
+        const aIntervals = String(scaleDef.AvoidNoteIntervals || "").split(',').map(s=>s.trim());
+        
+        const kb = {};
+
+        // 1. Identify Chord Tones (Background)
+        cTones.forEach(t => {
+            if(!kb[t.semi]) kb[t.semi] = { isChord: false, dotType: null };
+            kb[t.semi].isChord = true;
+        });
+
+        // 2. Identify Scale Tones (Dots)
+        sTones.forEach(t => {
+            if(!kb[t.semi]) kb[t.semi] = { isChord: false, dotType: null };
+            
+            let type = 'scale'; 
+            
+            if (aIntervals.includes(t.interval)) {
+                type = 'avoid';
+            } else if (gIntervals.includes(t.interval)) {
+                type = 'guide';
+            }
+            
+            if (t.interval === 'P1') {
+                type = 'root';
+            }
+
+            const priorities = { 'root': 4, 'avoid': 3, 'guide': 2, 'scale': 1, null: 0 };
+            if (priorities[type] > priorities[kb[t.semi].dotType]) {
+                kb[t.semi].dotType = type;
+            }
+        });
+
+        res.keyboardMap = kb;
+        res.chordTonesStr = cTones.map(t => t.name).join(", ");
+        const guideObjs = sTones.filter(t => gIntervals.includes(t.interval));
+        res.guideTonesStr = guideObjs.map(t => t.name).join(", ");
+        const avoidObjs = sTones.filter(t => aIntervals.includes(t.interval));
+        res.avoidNotesStr = avoidObjs.map(t => `(${t.name})`).join(", ");
+        res.scaleTonesStr = sTones.map(t => {
+            let name = t.name;
+            if (aIntervals.includes(t.interval)) return `(${name})`;
+            if (gIntervals.includes(t.interval)) return `${name}'`;
+            return name;
+        }).join(" ");
+
+        return res;
+    }
+}
+
+// === APP UI ===
+
+const engine = new TheoryEngine();
+
+const app = {
+    // Data now includes 'key' per row
+    rows: [
+        { key: "C", chord: "Dm7" },
+        { key: "C", chord: "G7" },
+        { key: "C", chord: "CM7" },
+        { key: "Eb", chord: "Fm7" }, // Modulation demo
+        { key: "Eb", chord: "Bb7" },
+        { key: "Eb", chord: "EbM7" }
+    ],
+
+    init() {
+        this.renderTable();
+        this.setupKeyboardUI();
+    },
+
+    addRow() {
+        // Inherit key from previous row for convenience
+        const lastKey = this.rows.length > 0 ? this.rows[this.rows.length - 1].key : "C";
+        this.rows.push({ key: lastKey, chord: "" });
+        this.renderTable();
+    },
+
+    updateRow(index, field, value) {
+        this.rows[index][field] = value;
+        this.recalcAll();
+    },
+
+    recalcAll() {
+        this.renderTable();
+    },
+
+    renderTable() {
+        const tbody = document.querySelector('#mainTable tbody');
+        tbody.innerHTML = '';
+
+        this.rows.forEach((row, i) => {
+            const analysis = engine.analyze(row.key, row.chord);
+            
+            const tr = document.createElement('tr');
+            tr.onclick = () => this.highlightRow(i, analysis);
+            
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td><input class="key-input" value="${row.key}" oninput="app.updateRow(${i}, 'key', this.value)"></td>
+                <td><input value="${row.chord}" oninput="app.updateRow(${i}, 'chord', this.value)"></td>
+                <td>${analysis.roman}</td>
+                <td>${analysis.func}</td>
+                <td>${analysis.scaleName}</td>
+                <td>${analysis.chordTonesStr}</td>
+                <td>${analysis.guideTonesStr}</td>
+                <td style="color:#d32f2f">${analysis.avoidNotesStr}</td>
+                <td>${analysis.scaleTonesStr}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    highlightRow(index, analysis) {
+        const rows = document.querySelectorAll('#mainTable tbody tr');
+        rows.forEach(r => r.classList.remove('selected-row'));
+        if (rows[index]) rows[index].classList.add('selected-row');
+
+        this.updateKeyboard(analysis.keyboardMap);
+    },
+
+    setupKeyboardUI() {
+        const kb = document.getElementById('keyboard');
+        let html = '';
+        
+        const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const isBlack = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+
+        // 3. 3 Octaves (0, 1, 2)
+        for(let oct=0; oct<3; oct++) {
+            for(let i=0; i<12; i++) {
+                const type = isBlack[i] ? 'black' : 'white';
+                html += `<div class="key ${type}" data-semi="${i}">
+                            <div class="key-label">${notes[i]}</div>
+                         </div>`;
+            }
+        }
+        html += `<div class="key white" data-semi="0"><div class="key-label">C</div></div>`;
+
+        kb.innerHTML = html;
+    },
+
+    updateKeyboard(map) {
+        const keys = document.querySelectorAll('.key');
+        keys.forEach(k => {
+            k.classList.remove('chord-bg');
+            const oldDot = k.querySelector('.dot');
+            if(oldDot) oldDot.remove();
+            
+            const semi = parseInt(k.getAttribute('data-semi'));
+            
+            if (map && map[semi]) {
+                const data = map[semi];
+                
+                if (data.isChord) {
+                    k.classList.add('chord-bg');
+                }
+
+                if (data.dotType) {
+                    const dot = document.createElement('div');
+                    dot.className = `dot ${data.dotType}`;
+                    k.appendChild(dot);
+                }
+            }
+        });
+    }
+};
+
+app.init();
+</script>
+</body>
+</html>

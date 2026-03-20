@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    /* ブラウザで直接動かすための設定
+      "nodenext" から "esnext" に変更し、不要なモジュール化を解除しました。
+    */
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    /* ここが重要：勝手にモジュール化（exportsなどが入る）のを防ぎます
+      "force" だったものを削除（デフォルトの auto に戻す）しています
+    */
+    // "moduleDetection": "force", 
+    /* 基本設定 */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    /* 出力設定（ソースマップなどはそのまま維持） */
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    /* 安全性のための設定（元のファイルにあったものを維持） */
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedSideEffectImports": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  }
+}

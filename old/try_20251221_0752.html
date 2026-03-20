@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>JCSC x CoF Integration</title>
+<style>
+    /* =========================================
+       1. 共通変数
+       ========================================= */
+    :root {
+        /* JCSC Variables */
+        --bg-body: #f4f4f4;
+        --bg-container: #fff;
+        --text-main: #333;
+        --text-sub: #888;
+        --border-color: #ccc;
+        --header-bg: #fff;
+        --th-bg: #f0f0f0;
+        --th-text: #333;
+        --tr-even: #f9f9f9;
+        --tr-hover: #f0f0f0;
+        --tr-selected: #e3f2fd;
+        --key-white: #fff;
+        --key-black: #333;
+        --chord-bg: #b3e5fc;
+        --chord-border: #81d4fa;
+        --btn-bg: #eee;
+        --btn-text: #555;
+        --input-focus: #e3f2fd;
+        
+        /* Links */
+        --link-color: #0366d6;
+        --link-hover: #004085;
+
+        /* CoF Specific */
+        --cof-stroke: #aaa;
+        --cof-staff-bg: #fff;
+        --cof-staff-stroke: #000;
+        
+        /* Highlight Colors */
+        --hl-root-border: #333; 
+        
+        /* Context (Diatonic) - Blue */
+        --hl-diatonic: #e1f5fe;   
+        --hl-diatonic-border: #039be5;
+        --hl-tritone: #fff9c4;        
+        --hl-tritone-border: #fbc02d;
+
+        /* Active Chord - Red (Must stand out) */
+        --hl-active-chord: #d32f2f; 
+        --hl-active-chord-stroke: #b71c1c;
+        
+        --arrow-color: #555;
+    }
+
+    body.dark-mode {
+        /* JCSC Dark */
+        --bg-body: #121212;
+        --bg-container: #1e1e1e;
+        --text-main: #e0e0e0;
+        --text-sub: #aaa;
+        --border-color: #444;
+        --header-bg: #1e1e1e;
+        --th-bg: #2d2d2d;
+        --th-text: #e0e0e0;
+        --tr-even: #252525;
+        --tr-hover: #333;
+        --tr-selected: #0d47a1;
+        --key-white: #ddd;
+        --key-black: #111;
+        --chord-bg: #01579b;
+        --chord-border: #0277bd;
+        --btn-bg: #333;
+        --btn-text: #ccc;
+        --input-focus: #263238;
+        
+        --link-color: #64b5f6;
+        --link-hover: #9be7ff;
+
+        /* CoF Dark */
+        --cof-stroke: #555;
+        --cof-staff-bg: #2c2c2c;
+        --cof-staff-stroke: #e0e0e0;
+        
+        --hl-root-border: #fff;
+        
+        --hl-diatonic: #01579b;
+        --hl-diatonic-border: #4fc3f7;
+        --hl-tritone: #7f6a20; 
+        --hl-tritone-border: #d4b64a;
+
+        --hl-active-chord: #b71c1c; 
+        --hl-active-chord-stroke: #ff8a80;
+
+        --arrow-color: #bbb;
+    }
+
+    /* === Base Layout === */
+    body { 
+        font-family: 'Segoe UI', Helvetica, Arial, sans-serif; 
+        background: var(--bg-body); 
+        margin: 0; padding: 0; color: var(--text-main); 
+        height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        transition: background 0.3s, color 0.3s;
+    }
+    
+    /* Fullscreen fallback */
+    body.is-fullscreen {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
+    }
+
+    /* === Header === */
+    header {
+        background: var(--header-bg); padding: 4px 10px; border-bottom: 1px solid var(--border-color);
+        display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;
+        min-height: 44px; box-sizing: border-box;
+    }
+    
+    .header-left { display: flex; flex-direction: column; justify-content: center; }
+    .header-title { font-size: 16px; font-weight: bold; margin: 0; line-height: 1.2; }
+    .header-meta { font-size: 10px; color: var(--text-sub); line-height: 1.2; }
+    
+    .header-link { 
+        color: var(--link-color); 
+        text-decoration: underline; 
+        font-size: 10px; 
+        cursor: pointer;
+    }
+    .header-link:hover { color: var(--link-hover); }
+
+    .header-controls { display: flex; gap: 4px; align-items: center; margin-top: 6px; }
+    
+    .btn-std { 
+        font-size: 11px; padding: 0 10px; height: 28px; 
+        cursor: pointer; background: var(--btn-bg); color: var(--btn-text); 
+        border: 1px solid var(--border-color); border-radius: 4px; 
+        display: inline-flex; align-items: center; justify-content: center;
+        white-space: nowrap;
+    }
+    .btn-std:hover { opacity: 0.8; }
+    .btn-std.active { background: var(--input-focus); border-color: var(--chord-border); font-weight: bold; color: #0277bd; }
+    body.dark-mode .btn-std.active { background: #0d47a1; color: #fff; border-color: #444; }
+
+    .sep { width: 1px; height: 18px; background: var(--border-color); margin: 0 4px; }
+
+    /* === Visualizer Section === */
+    .visualizer-section {
+        background: var(--bg-container);
+        border-bottom: 1px solid var(--border-color);
+        flex-shrink: 0;
+        display: flex; flex-direction: column; align-items: center;
+        max-height: 55vh; 
+        overflow-y: auto;
+        transition: max-height 0.3s;
+    }
+    
+    .view-container { display: none; width: 100%; flex-direction: column; align-items: center; padding: 5px 0; }
+    .view-container.active { display: flex; }
+
+    /* --- Keyboard Styles --- */
+    .keyboard-container { overflow-x: auto; display: flex; justify-content: center; width: 100%; padding-bottom: 10px; }
+    .keyboard { display: flex; position: relative; height: 80px; padding-top: 5px; width: max-content; }
+    .key { border: 1px solid #999; border-radius: 0 0 3px 3px; position: relative; z-index: 1; display: flex; justify-content: center; }
+    .key.white { width: 30px; height: 75px; background: var(--key-white); }
+    .key.black { width: 20px; height: 45px; background: var(--key-black); margin-left: -10px; margin-right: -10px; z-index: 2; border-radius: 0 0 2px 2px; }
+    .key.white.chord-bg { background: var(--chord-bg) !important; } 
+    .key.black.chord-bg { background: var(--chord-bg) !important; border-color: var(--chord-border); }
+    .key-label { position: absolute; bottom: 2px; width: 100%; text-align: center; font-size: 8px; color: #aaa; pointer-events: none; }
+    .key.black .key-label { display: none; }
+    .dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; bottom: 12px; z-index: 5; border: 1px solid rgba(255,255,255,0.9); }
+    .key.black .dot { bottom: 6px; }
+    .dot.root { background: #d50000; transform: scale(1.2); }
+    .dot.guide { background: #ef5350; }
+    .dot.avoid { background: #795548; }
+    .dot.scale { background: #ffcdd2; }
+    body.dark-mode .dot.scale { background: #e57373; }
+    
+    .legend { margin-top: 2px; font-size: 10px; color: var(--text-main); display: flex; gap: 10px; opacity: 0.8; margin-bottom: 5px; }
+    .l-box { width: 8px; height: 8px; border: 1px solid #ccc; display: inline-block; }
+    .l-bg-chord { background: var(--chord-bg); }
+    .l-circle { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .l-root { background: #d50000; } .l-guide { background: #ef5350; } .l-avoid { background: #795548; } .l-scale { background: #ffcdd2; }
+
+    /* --- CoF Styles --- */
+    .cof-layout-container {
+        display: flex;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        padding: 5px;
+        flex-wrap: wrap; 
+    }
+    
+    .cof-visual-col { flex-shrink: 0; }
+    
+    .cof-controls-col { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        gap: 15px; 
+    }
+
+    /* 円のラッパー: 初期サイズ */
+    .circle-wrapper { width: 280px; height: 280px; position: relative; user-select: none; }
+    
+    svg { width: 100%; height: 100%; overflow: visible; }
+    .sector { stroke: var(--cof-stroke); stroke-width: 1px; fill: var(--bg-container); transition: fill 0.2s; cursor: pointer; }
+    .sector:hover { opacity: 0.9; }
+    .sector-text, .sector-text-inner { font-size: 14px; fill: var(--text-main); pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+    .sector-text-inner { fill: var(--text-sub); }
+    .circle-wrapper.mode-major .sector-text { font-weight: bold; }
+    .circle-wrapper.mode-minor .sector-text-inner { font-weight: bold; fill: var(--text-main); }
+    
+    /* Highlight Classes */
+    .highlight-diatonic { fill: var(--hl-diatonic) !important; stroke: var(--hl-diatonic-border) !important; stroke-width: 1.5px !important; }
+    
+    .highlight-tritone { fill: var(--hl-tritone) !important; stroke: var(--hl-tritone-border) !important; stroke-width: 1px !important; stroke-dasharray: 4 2; }
+    
+    /* Root Border removed as requested, just keeping structure if needed later */
+    .highlight-root { stroke: var(--hl-root-border) !important; stroke-width: 0px !important; /* 枠線を消す */ }
+    
+    /* ACTIVE CHORD */
+    path.highlight-active { 
+        fill: var(--hl-active-chord) !important; 
+        stroke: var(--hl-active-chord-stroke) !important; 
+        opacity: 1 !important; 
+    }
+    .highlight-active text { fill: #fff !important; font-weight: bold; }
+
+    .handle-group { cursor: grab; } .handle-group:active { cursor: grabbing; }
+    .handle-knob { stroke: #999; stroke-width: 1px; } .handle-arrow { fill: var(--arrow-color); pointer-events: none; } .handle-hit { fill: transparent; }
+
+    .key-group { display: flex; align-items: center; gap: 10px; }
+    .key-display { font-size: 20px; font-weight: bold; min-width: 80px; text-align: center; }
+    .toggle-group { display: flex; background: var(--btn-bg); border-radius: 20px; padding: 2px; }
+    .toggle-opt { padding: 4px 12px; font-size: 11px; cursor: pointer; border-radius: 18px; }
+    .toggle-opt.active { background: #fff; color: #000; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    body.dark-mode .toggle-opt.active { background: #555; color: #fff; }
+
+    .staff-box { width: 140px; height: 100px; background: var(--cof-staff-bg); border: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; border-radius: 4px; }
+    .st-line { stroke: var(--cof-staff-stroke); stroke-width: 1; }
+    .st-clef-stroke { fill: none; stroke: var(--cof-staff-stroke); stroke-width: 7px; stroke-linecap: round; stroke-linejoin: round; }
+    .st-clef-fill { fill: var(--cof-staff-stroke); stroke: none; }
+    .st-acc-custom { fill: none; stroke: var(--cof-staff-stroke); stroke-linecap: round; stroke-linejoin: round; }
+    .st-brace { stroke: var(--cof-staff-stroke); stroke-width: 2; }
+
+    /* === RESPONSIVE LAYOUT LOGIC === */
+    /* Mobile / Portrait (< 600px) */
+    @media (max-width: 600px) {
+        .cof-layout-container {
+            flex-direction: column-reverse; 
+            gap: 10px;
+        }
+        .cof-controls-col {
+            flex-direction: column;
+            gap: 5px;
+        }
+        /* Mobile: Maximize Circle Width */
+        .circle-wrapper { 
+            width: 90vw; 
+            max-width: 380px; 
+            height: auto; 
+            aspect-ratio: 1 / 1; 
+            margin-bottom: 5px; 
+        }
+        .key-display { font-size: 18px; }
+        .staff-box { width: 120px; height: 75px; }
+        .header-title { font-size: 14px; }
+        .header-meta { display: none; } 
+    }
+
+    /* Landscape / Desktop (>= 601px) */
+    @media (min-width: 601px) {
+        .cof-layout-container {
+            flex-direction: row;
+        }
+        .cof-controls-col {
+            align-items: flex-start;
+        }
+    }
+
+    /* === Table Area === */
+    .main-content { flex-grow: 1; overflow: hidden; padding: 5px; display: flex; flex-direction: column; }
+    .table-wrapper { border: 1px solid var(--border-color); background: var(--bg-container); overflow: auto; height: 100%; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--border-color); white-space: nowrap; color: var(--text-main); vertical-align: middle; }
+    th { background: var(--th-bg); color: var(--th-text); position: sticky; top: 0; z-index: 10; font-weight: 600; text-align: center; border-bottom: 2px solid var(--border-color); }
+    tr:nth-child(even) { background: var(--tr-even); }
+    tr:hover { background: var(--tr-hover); }
+    tr.selected-row { background: var(--tr-selected) !important; }
+    .editable-cell { display: inline-block; min-width: 30px; min-height: 1.2em; font-weight: bold; color: var(--text-main); outline: none; }
+    .col-key .editable-cell { color: #0056b3; text-align: center; width: 100%; }
+    body.dark-mode .col-key .editable-cell { color: #64b5f6; }
+    .mono-col { font-family: 'Consolas', monospace; font-size: 11px; }
+    .btn-action { width: 20px; height: 20px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--btn-text); cursor: pointer; border-radius: 3px; font-size: 10px; }
+
+</style>
+</head>
+<body>
+<header>
+    <div class="header-left">
+        <div class="header-title">JCSC</div>
+        <div class="header-meta">
+            <div>(c) 2025 GoodRelax. MIT License.</div>
+            <a href="https://github.com/GoodRelax/Music" target="_blank" class="header-link">Jump to Development on GitHub</a>
+        </div>
+    </div>
+    <div class="header-controls">
+        <button class="btn-std" onclick="toggleFullScreen()" title="Full Screen">⛶</button>
+        <button class="btn-std active" id="btn-show-key" onclick="switchVisualizer('keyboard')" title="Show Keyboard">🎹</button>
+        <button class="btn-std" id="btn-show-cof" onclick="switchVisualizer('cof')" title="Show Circle of Fifths">🔵</button>
+        
+        <div class="sep"></div>
+        
+        <button class="btn-std" onclick="jcscApp.copyTSV()">Copy</button>
+        <button class="btn-std" onclick="toggleAllDark()">🌙</button>
+        <button class="btn-std" onclick="deselectAll()">↺</button>
+    </div>
+</header>
+
+<div class="visualizer-section" id="visualizerSection">
+    
+    <div id="view-keyboard" class="view-container active">
+        <div class="keyboard-container"><div id="keyboard" class="keyboard"></div></div>
+        <div class="legend">
+            <div class="legend-item"><span class="l-box l-bg-chord"></span> Chord</div>
+            <div class="legend-item"><span class="l-circle l-root"></span> Root</div>
+            <div class="legend-item"><span class="l-circle l-guide"></span> Guide</div>
+            <div class="legend-item"><span class="l-circle l-avoid"></span> Avoid</div>
+            <div class="legend-item"><span class="l-circle l-scale"></span> Scale</div>
+        </div>
+    </div>
+
+    <div id="view-cof" class="view-container">
+        <div class="cof-layout-container">
+            <div class="cof-visual-col">
+                <div class="circle-wrapper" id="circleWrapper"></div>
+            </div>
+
+            <div class="cof-controls-col">
+                <div class="key-group">
+                    <div class="key-display" id="keyNameDisplay">Key : C</div>
+                    <div class="toggle-group">
+                        <div class="toggle-opt active" id="btnMaj" onclick="cofApp.setMode(false)">Maj</div>
+                        <div class="toggle-opt" id="btnMin" onclick="cofApp.setMode(true)">Min</div>
+                    </div>
+                </div>
+                <div class="staff-box" id="staffBox"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="main-content">
+    <div class="table-wrapper">
+        <table id="mainTable">
+            <thead>
+                <tr>
+                    <th style="width: 20px;">#</th>
+                    <th style="width: 30px;">Key</th>
+                    <th style="width: 60px;">Chord</th>
+                    <th style="width: 40px;">Deg</th>
+                    <th style="width: 30px;">Func</th>
+                    <th style="width: 90px;">Scale</th>
+                    <th>Chord Tones</th>
+                    <th>Scale Notes</th>
+                    <th style="width: 50px;">Act</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// === UI Logic ===
+let currentVis = 'keyboard';
+
+function switchVisualizer(mode) {
+    const section = document.getElementById('visualizerSection');
+    const viewKey = document.getElementById('view-keyboard');
+    const viewCoF = document.getElementById('view-cof');
+    const btnKey = document.getElementById('btn-show-key');
+    const btnCoF = document.getElementById('btn-show-cof');
+
+    if (currentVis === mode) {
+        section.style.display = 'none';
+        btnKey.classList.remove('active');
+        btnCoF.classList.remove('active');
+        currentVis = null;
+    } else {
+        section.style.display = 'flex';
+        viewKey.classList.remove('active');
+        viewCoF.classList.remove('active');
+        btnKey.classList.remove('active');
+        btnCoF.classList.remove('active');
+
+        if(mode === 'keyboard') {
+            viewKey.classList.add('active');
+            btnKey.classList.add('active');
+        } else {
+            viewCoF.classList.add('active');
+            btnCoF.classList.add('active');
+        }
+        currentVis = mode;
+    }
+}
+
+function toggleFullScreen() {
+    const doc = window.document;
+    const docEl = doc.documentElement;
+
+    const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+    const cancel = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+
+    if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+        if (request) {
+            request.call(docEl).catch(err => {
+                document.body.classList.toggle('is-fullscreen');
+            });
+        } else {
+            document.body.classList.toggle('is-fullscreen');
+        }
+    } else {
+        if (cancel) cancel.call(doc);
+        document.body.classList.remove('is-fullscreen');
+    }
+}
+
+function toggleAllDark() {
+    document.body.classList.toggle('dark-mode');
+    if (typeof cofApp !== 'undefined') cofApp.updateKey(); 
+}
+
+function deselectAll() {
+    const rows = document.querySelectorAll('#mainTable tbody tr');
+    rows.forEach(r => r.classList.remove('selected-row'));
+    const keys = document.querySelectorAll('.key');
+    keys.forEach(k => {
+        k.classList.remove('chord-bg');
+        const d = k.querySelector('.dot'); if(d) d.remove();
+    });
+    cofApp.setMode(false); 
+    cofApp.currentMode = 'NATURAL'; 
+    cofApp.jumpTo(0); 
+    document.getElementById('keyNameDisplay').innerText = "Key : C";
+    setTimeout(() => cofApp.updateKey(null), 100); 
+}
+
+// === Integration Glue ===
+const AbsoluteLocationMap = {
+    "C": { idx: 0, ring: 'major', mode: 'NATURAL' },
+    "G": { idx: 1, ring: 'major', mode: 'SHARP' },
+    "D": { idx: 2, ring: 'major', mode: 'SHARP' },
+    "A": { idx: 3, ring: 'major', mode: 'SHARP' },
+    "E": { idx: 4, ring: 'major', mode: 'SHARP' },
+    "B": { idx: 5, ring: 'major', mode: 'SHARP' },
+    "Cb":{ idx: 5, ring: 'major', mode: 'FLAT' }, 
+    "F#":{ idx: 6, ring: 'major', mode: 'SHARP' },
+    "Gb":{ idx: 6, ring: 'major', mode: 'FLAT' }, 
+    "Db":{ idx: 7, ring: 'major', mode: 'FLAT' },
+    "C#":{ idx: 7, ring: 'major', mode: 'SHARP' }, 
+    "Ab":{ idx: 8, ring: 'major', mode: 'FLAT' },
+    "Eb":{ idx: 9, ring: 'major', mode: 'FLAT' },
+    "Bb":{ idx: 10, ring: 'major', mode: 'FLAT' },
+    "F": { idx: 11, ring: 'major', mode: 'FLAT' },
+
+    "Am": { idx: 0, ring: 'minor', mode: 'NATURAL' },
+    "Em": { idx: 1, ring: 'minor', mode: 'SHARP' },
+    "Bm": { idx: 2, ring: 'minor', mode: 'SHARP' },
+    "F#m":{ idx: 3, ring: 'minor', mode: 'SHARP' },
+    "Gbm":{ idx: 3, ring: 'minor', mode: 'FLAT' },
+    "C#m":{ idx: 4, ring: 'minor', mode: 'SHARP' },
+    "Dbm":{ idx: 4, ring: 'minor', mode: 'FLAT' },
+    "G#m":{ idx: 5, ring: 'minor', mode: 'SHARP' },
+    "Abm":{ idx: 5, ring: 'minor', mode: 'FLAT' },
+    "D#m":{ idx: 6, ring: 'minor', mode: 'SHARP' },
+    "Ebm":{ idx: 6, ring: 'minor', mode: 'FLAT' }, 
+    "Bbm":{ idx: 7, ring: 'minor', mode: 'FLAT' },
+    "A#m":{ idx: 7, ring: 'minor', mode: 'SHARP' },
+    "Fm": { idx: 8, ring: 'minor', mode: 'FLAT' },
+    "Cm": { idx: 9, ring: 'minor', mode: 'FLAT' },
+    "Gm": { idx: 10, ring: 'minor', mode: 'FLAT' },
+    "Dm": { idx: 11, ring: 'minor', mode: 'FLAT' }
+};
+
+function onRowHighlight(keyStr, chordStr) {
+    if (typeof cofApp === 'undefined') return;
+    let searchKey = keyStr.trim();
+    let def = AbsoluteLocationMap[searchKey];
+    if (!def) def = { idx: 0, ring: 'major', mode: 'NATURAL' };
+
+    const isMinorMode = (def.ring === 'minor');
+    cofApp.currentMode = def.mode; 
+    cofApp.setMode(isMinorMode);       
+    cofApp.jumpTo(def.idx);        
+    document.getElementById('keyNameDisplay').innerText = "Key : " + keyStr;
+
+    const match = chordStr.match(/^([A-G](?:b+|#+)?)(.*)$/);
+    if(match) {
+        let cRoot = match[1];
+        let cQuality = match[2];
+        let cIsMinor = cQuality.startsWith('m') && !cQuality.startsWith('maj');
+        let chordNameForLookup = cRoot;
+        if (cIsMinor) chordNameForLookup += "m"; 
+        let cDef = AbsoluteLocationMap[chordNameForLookup];
+        
+        cofApp.updateKey({ 
+            idx: cDef ? cDef.idx : -1, 
+            ring: cDef ? cDef.ring : 'major' 
+        });
+    } else {
+        cofApp.updateKey(null);
+    }
+}
+
+// --- JCSC LOGIC ---
+const jcscDB = {
+    "intervals": [
+        {"IntervalID":"P1","DeltaSemitone":"0","DeltaDegree":"0"},
+        {"IntervalID":"m2","DeltaSemitone":"1","DeltaDegree":"1"},
+        {"IntervalID":"M2","DeltaSemitone":"2","DeltaDegree":"1"},
+        {"IntervalID":"m3","DeltaSemitone":"3","DeltaDegree":"2"},
+        {"IntervalID":"M3","DeltaSemitone":"4","DeltaDegree":"2"},
+        {"IntervalID":"P4","DeltaSemitone":"5","DeltaDegree":"3"},
+        {"IntervalID":"A4","DeltaSemitone":"6","DeltaDegree":"3"},
+        {"IntervalID":"d5","DeltaSemitone":"6","DeltaDegree":"4"},
+        {"IntervalID":"P5","DeltaSemitone":"7","DeltaDegree":"4"},
+        {"IntervalID":"A5","DeltaSemitone":"8","DeltaDegree":"4"},
+        {"IntervalID":"m6","DeltaSemitone":"8","DeltaDegree":"5"},
+        {"IntervalID":"M6","DeltaSemitone":"9","DeltaDegree":"5"},
+        {"IntervalID":"d7","DeltaSemitone":"9","DeltaDegree":"6"},
+        {"IntervalID":"m7","DeltaSemitone":"10","DeltaDegree":"6"},
+        {"IntervalID":"M7","DeltaSemitone":"11","DeltaDegree":"6"},
+        {"IntervalID":"A1","DeltaSemitone":"1","DeltaDegree":"0"},
+        {"IntervalID":"d4","DeltaSemitone":"4","DeltaDegree":"3"},
+        {"IntervalID":"d6","DeltaSemitone":"7","DeltaDegree":"5"},
+        {"IntervalID":"P4","IntervalName":"Perfect 4th (Enharmonic A3)","DeltaSemitone":"5","DeltaDegree":"2"}, 
+        {"IntervalID":"d3","DeltaSemitone":"2","DeltaDegree":"2"},
+        {"IntervalID":"b9","DeltaSemitone":"13","DeltaDegree":"8"},
+        {"IntervalID":"9","DeltaSemitone":"14","DeltaDegree":"8"},
+        {"IntervalID":"#9","DeltaSemitone":"15","DeltaDegree":"8"},
+        {"IntervalID":"11","DeltaSemitone":"17","DeltaDegree":"10"},
+        {"IntervalID":"#11","DeltaSemitone":"18","DeltaDegree":"10"},
+        {"IntervalID":"b13","DeltaSemitone":"20","DeltaDegree":"12"},
+        {"IntervalID":"13","DeltaSemitone":"21","DeltaDegree":"12"}
+    ],
+    "chords": [
+        {"ChordSymbol":"","IntervalsStructure":"P1, M3, P5","GuideToneIntervals":"M3","RomanSuffix":""},
+        {"ChordSymbol":"m","IntervalsStructure":"P1, m3, P5","GuideToneIntervals":"m3","RomanSuffix":"m"},
+        {"ChordSymbol":"dim","IntervalsStructure":"P1, m3, d5","GuideToneIntervals":"m3, d5","RomanSuffix":"dim"},
+        {"ChordSymbol":"aug","IntervalsStructure":"P1, M3, A5","GuideToneIntervals":"M3, A5","RomanSuffix":"aug"},
+        {"ChordSymbol":"sus4","IntervalsStructure":"P1, P4, P5","GuideToneIntervals":"P4","RomanSuffix":"sus4"},
+        {"ChordSymbol":"M7","IntervalsStructure":"P1, M3, P5, M7","GuideToneIntervals":"M3, M7","RomanSuffix":"M7"},
+        {"ChordSymbol":"M6","IntervalsStructure":"P1, M3, P5, M6","GuideToneIntervals":"M3, M6","RomanSuffix":"6"},
+        {"ChordSymbol":"M9","IntervalsStructure":"P1, M3, P5, M7, 9","GuideToneIntervals":"M3, M7, 9","RomanSuffix":"M9"},
+        {"ChordSymbol":"M69","IntervalsStructure":"P1, M3, P5, M6, 9","GuideToneIntervals":"M3, M6, 9","RomanSuffix":"69"},
+        {"ChordSymbol":"M7#11","IntervalsStructure":"P1, M3, P5, M7, #11","GuideToneIntervals":"M3, M7, #11","RomanSuffix":"M7#11"},
+        {"ChordSymbol":"M13","IntervalsStructure":"P1, M3, P5, M7, 9, 13","GuideToneIntervals":"M3, M7, 13","RomanSuffix":"M13"},
+        {"ChordSymbol":"m7","IntervalsStructure":"P1, m3, P5, m7","GuideToneIntervals":"m3, m7","RomanSuffix":"m7"},
+        {"ChordSymbol":"m6","IntervalsStructure":"P1, m3, P5, M6","GuideToneIntervals":"m3, M6","RomanSuffix":"m6"},
+        {"ChordSymbol":"m9","IntervalsStructure":"P1, m3, P5, m7, 9","GuideToneIntervals":"m3, m7, 9","RomanSuffix":"m9"},
+        {"ChordSymbol":"m11","IntervalsStructure":"P1, m3, P5, m7, 9, 11","GuideToneIntervals":"m3, m7, 11","RomanSuffix":"m11"},
+        {"ChordSymbol":"mM7","IntervalsStructure":"P1, m3, P5, M7","GuideToneIntervals":"m3, M7","RomanSuffix":"mM7"},
+        {"ChordSymbol":"m7b5","IntervalsStructure":"P1, m3, d5, m7","GuideToneIntervals":"m3, m7","RomanSuffix":"m7b5"},
+        {"ChordSymbol":"dim7","IntervalsStructure":"P1, m3, d5, d7","GuideToneIntervals":"m3, d7","RomanSuffix":"dim7"},
+        {"ChordSymbol":"7","IntervalsStructure":"P1, M3, P5, m7","GuideToneIntervals":"M3, m7","RomanSuffix":"7"},
+        {"ChordSymbol":"9","IntervalsStructure":"P1, M3, P5, m7, 9","GuideToneIntervals":"M3, m7, 9","RomanSuffix":"9"},
+        {"ChordSymbol":"13","IntervalsStructure":"P1, M3, P5, m7, 9, 13","GuideToneIntervals":"M3, m7, 13","RomanSuffix":"13"},
+        {"ChordSymbol":"7sus4","IntervalsStructure":"P1, P4, P5, m7","GuideToneIntervals":"P4, m7","RomanSuffix":"7sus4"},
+        {"ChordSymbol":"7b9","IntervalsStructure":"P1, M3, P5, m7, b9","GuideToneIntervals":"M3, m7, b9","RomanSuffix":"7b9"},
+        {"ChordSymbol":"7#9","IntervalsStructure":"P1, M3, P5, m7, #9","GuideToneIntervals":"M3, m7, #9","RomanSuffix":"7#9"},
+        {"ChordSymbol":"7#11","IntervalsStructure":"P1, M3, P5, m7, #11","GuideToneIntervals":"M3, m7, #11","RomanSuffix":"7#11"},
+        {"ChordSymbol":"7b13","IntervalsStructure":"P1, M3, P5, m7, b13","GuideToneIntervals":"M3, m7, b13","RomanSuffix":"7b13"},
+        {"ChordSymbol":"7alt","IntervalsStructure":"P1, M3, d5, m7, b9, #9, b13","GuideToneIntervals":"M3, m7","RomanSuffix":"7alt"},
+        {"ChordSymbol":"C","IntervalsStructure":"P1, M3, P5","GuideToneIntervals":"M3","RomanSuffix":""},
+        {"ChordSymbol":"C13","IntervalsStructure":"P1, M3, P5, m7, 9, 13","GuideToneIntervals":"M3, m7","RomanSuffix":"13"},
+        {"ChordSymbol":"C7alt","IntervalsStructure":"P1, M3, d5, m7, b9, #9, b13","GuideToneIntervals":"M3, m7","RomanSuffix":"7alt"},
+        {"ChordSymbol":"Cdim7","IntervalsStructure":"P1, m3, d5, d7","GuideToneIntervals":"m3, d7","RomanSuffix":"dim7"},
+        {"ChordSymbol":"Caug","IntervalsStructure":"P1, M3, A5","GuideToneIntervals":"M3, A5","RomanSuffix":"aug"}
+    ],
+    "scales": [
+        {"ScaleName":"Ionian","IntervalsStructure":"P1, M2, M3, P4, P5, M6, M7","AvoidNoteIntervals":"P4"},
+        {"ScaleName":"Dorian","IntervalsStructure":"P1, M2, m3, P4, P5, M6, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"Phrygian","IntervalsStructure":"P1, m2, m3, P4, P5, m6, m7","AvoidNoteIntervals":"m2, m6"},
+        {"ScaleName":"Lydian","IntervalsStructure":"P1, M2, M3, A4, P5, M6, M7","AvoidNoteIntervals":""},
+        {"ScaleName":"Mixolydian","IntervalsStructure":"P1, M2, M3, P4, P5, M6, m7","AvoidNoteIntervals":"P4"},
+        {"ScaleName":"Aeolian","IntervalsStructure":"P1, M2, m3, P4, P5, m6, m7","AvoidNoteIntervals":"m6"},
+        {"ScaleName":"Locrian","IntervalsStructure":"P1, m2, m3, P4, d5, m6, m7","AvoidNoteIntervals":"m2"},
+        {"ScaleName":"Melodic Minor","IntervalsStructure":"P1, M2, m3, P4, P5, M6, M7","AvoidNoteIntervals":""},
+        {"ScaleName":"Dorian b2","IntervalsStructure":"P1, m2, m3, P4, P5, M6, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"Lydian Augmented","IntervalsStructure":"P1, M2, M3, A4, A5, M6, M7","AvoidNoteIntervals":""},
+        {"ScaleName":"Lydian Dominant","IntervalsStructure":"P1, M2, M3, A4, P5, M6, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"Mixolydian b6","IntervalsStructure":"P1, M2, M3, P4, P5, m6, m7","AvoidNoteIntervals":"P4"},
+        {"ScaleName":"Locrian #2","IntervalsStructure":"P1, M2, m3, P4, d5, m6, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"Altered","IntervalsStructure":"P1, b9, #9, M3, #11, b13, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"H-W Diminished","IntervalsStructure":"P1, m2, m3, M3, A4, P5, M6, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"W-H Diminished","IntervalsStructure":"P1, M2, m3, P4, d5, m6, d7, M7","AvoidNoteIntervals":""},
+        {"ScaleName":"Whole Tone","IntervalsStructure":"P1, M2, M3, A4, A5, m7","AvoidNoteIntervals":""},
+        {"ScaleName":"Phrygian Dominant","IntervalsStructure":"P1, m2, M3, P4, P5, m6, m7","AvoidNoteIntervals":"m2, m6"},
+        {"ScaleName":"Okinawa","IntervalsStructure":"P1, M3, P4, P5, M7","AvoidNoteIntervals":""},
+        {"ScaleName":"HMP5 below","IntervalsStructure":"P1, m2, M3, P4, P5, m6, m7","AvoidNoteIntervals":"m2, m6"},
+        {"ScaleName":"Bebop Dominant","IntervalsStructure":"P1, M2, M3, P4, P5, M6, m7, M7","AvoidNoteIntervals":""},
+        {"ScaleName":"Japanese (Hirajoshi)","IntervalsStructure":"P1, M2, m3, P5, m6","AvoidNoteIntervals":""},
+        {"ScaleName":"Japanese (Insen)","IntervalsStructure":"P1, m2, P4, P5, m7","AvoidNoteIntervals":""}
+    ],
+    "rules": [
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"T","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"M7","ScaleName":"Okinawa","HarmonicFunction":"T","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"7","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"A1","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"M6","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"M69","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"M7","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"M9","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P1","ChordSymbol":"","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"m7","ScaleName":"Aeolian","HarmonicFunction":"SD","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"m2","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"7","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"A2","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"m","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"m11","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"m6","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m2","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"m7","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M2","ChordSymbol":"m9","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m2","ChordSymbol":"","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M3","ChordSymbol":"7","ScaleName":"Altered","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"m3","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M3","ChordSymbol":"7","ScaleName":"HMP5 below","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m3","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M3","ChordSymbol":"m","ScaleName":"Phrygian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M3","ChordSymbol":"m7","ScaleName":"Phrygian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P4","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"d4","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"A4","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P4","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P4","ChordSymbol":"m7","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P4","ChordSymbol":"M7#11","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"A4","ChordSymbol":"m7b5","ScaleName":"Locrian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P4","ChordSymbol":"M9","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P4","ChordSymbol":"","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Whole Tone","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Altered","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"HMP5 below","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Bebop Dominant","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7b9","ScaleName":"HMP5 below","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"13","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7alt","ScaleName":"Altered","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7b9","ScaleName":"H-W Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"7sus4","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"9","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"A5","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"P5","ChordSymbol":"","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M6","ChordSymbol":"7","ScaleName":"Altered","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Major","DegreeIntervalID":"m6","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M6","ChordSymbol":"7","ScaleName":"HMP5 below","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"d6","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m6","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M6","ChordSymbol":"m","ScaleName":"Aeolian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M6","ChordSymbol":"m7","ScaleName":"Aeolian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m6","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M7","ChordSymbol":"7","ScaleName":"Altered","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m7","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M7","ChordSymbol":"dim","ScaleName":"Locrian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"d7","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M7","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"m7","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Major","DegreeIntervalID":"M7","ChordSymbol":"m7b5","ScaleName":"Locrian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P1","ChordSymbol":"m7","ScaleName":"Aeolian","HarmonicFunction":"T","UsageType":"Alt"},
+        {"KeyType":"Minor","DegreeIntervalID":"P1","ChordSymbol":"m7","ScaleName":"Japanese (Hirajoshi)","HarmonicFunction":"T","UsageType":"Alt"},
+        {"KeyType":"Minor","DegreeIntervalID":"P1","ChordSymbol":"m","ScaleName":"Aeolian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P1","ChordSymbol":"m6","ScaleName":"Melodic Minor","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P1","ChordSymbol":"m7","ScaleName":"Dorian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P1","ChordSymbol":"mM7","ScaleName":"Melodic Minor","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"M2","ChordSymbol":"m7b5","ScaleName":"Locrian #2","HarmonicFunction":"SD","UsageType":"Alt"},
+        {"KeyType":"Minor","DegreeIntervalID":"m2","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"b2","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"M2","ChordSymbol":"dim","ScaleName":"Locrian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m2","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m2","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"b2","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"M2","ChordSymbol":"m7b5","ScaleName":"Locrian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m3","ChordSymbol":"7","ScaleName":"Mixolydian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m3","ChordSymbol":"M7","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m3","ChordSymbol":"M7#11","ScaleName":"Lydian Augmented","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m3","ChordSymbol":"","ScaleName":"Ionian","HarmonicFunction":"T","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P4","ChordSymbol":"m7","ScaleName":"Japanese (Insen)","HarmonicFunction":"SD","UsageType":"Alt"},
+        {"KeyType":"Minor","DegreeIntervalID":"P4","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"d4","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"A4","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P4","ChordSymbol":"m","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P4","ChordSymbol":"m6","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P4","ChordSymbol":"m7","ScaleName":"Dorian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"A4","ChordSymbol":"m7b5","ScaleName":"Locrian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Phrygian Dominant","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"HMP5 below","HarmonicFunction":"D","UsageType":"Alt"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"7","ScaleName":"Mixolydian b6","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"7alt","ScaleName":"Altered","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"7b9","ScaleName":"H-W Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"m","ScaleName":"Phrygian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"m7","ScaleName":"Phrygian","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"A5","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"P5","ChordSymbol":"","ScaleName":"Mixolydian b6","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m6","ChordSymbol":"7","ScaleName":"Lydian Dominant","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m6","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m6","ChordSymbol":"M7","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"M6","ChordSymbol":"m7b5","ScaleName":"Locrian #2","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m6","ChordSymbol":"","ScaleName":"Lydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m7","ChordSymbol":"7","ScaleName":"Mixolydian","HarmonicFunction":"SD","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"M7","ChordSymbol":"dim7","ScaleName":"W-H Diminished","HarmonicFunction":"D","UsageType":"Main"},
+        {"KeyType":"Minor","DegreeIntervalID":"m7","ChordSymbol":"","ScaleName":"Mixolydian","HarmonicFunction":"SD","UsageType":"Main"}
+    ]
+};
+
+class TheoryEngine {
+    constructor() {
+        this.intervals = {};
+        if(jcscDB.intervals) {
+            jcscDB.intervals.forEach(i => {
+                if (!this.intervals[i.IntervalID]) {
+                    this.intervals[i.IntervalID] = i;
+                }
+            });
+        }
+        this.chords = {};
+        if(jcscDB.chords) jcscDB.chords.forEach(c => this.chords[c.ChordSymbol] = c);
+        this.scales = {};
+        if(jcscDB.scales) jcscDB.scales.forEach(s => this.scales[s.ScaleName] = s);
+    }
+    parseNoteStruct(noteStr) {
+        if (!noteStr) return null;
+        noteStr = noteStr.trim();
+        const match = noteStr.match(/^([A-G])(b*|#*|x*)$/);
+        if (!match) return null;
+        const baseMap = {C:0, D:1, E:2, F:3, G:4, A:5, B:6};
+        const semiMap = {C:0, D:2, E:4, F:5, G:7, A:9, B:11};
+        const base = baseMap[match[1]];
+        let acc = 0;
+        if (match[2]) {
+            if (match[2].startsWith('b')) acc = -match[2].length;
+            else if (match[2].startsWith('#')) acc = match[2].length;
+            else if (match[2].startsWith('x')) acc = match[2].length * 2;
+        }
+        return {
+            baseDegree: base,
+            semitone: (semiMap[match[1]] + acc + 120) % 12, 
+            acc: acc,
+            baseName: match[1]
+        };
+    }
+    splitChord(input) {
+        if (!input) return { root: null, quality: null };
+        input = input.trim();
+        const match = input.match(/^([A-G](?:b+|#+|x)?)(.*)$/);
+        if (!match) return { root: null, quality: null };
+        return { root: match[1], quality: match[2] };
+    }
+    calculateNoteFromInterval(rootStruct, intervalId) {
+        const intervalDef = this.intervals[intervalId];
+        if (!intervalDef) return { name: "?", semi: 0 }; 
+        const dDeg = parseInt(intervalDef.DeltaDegree);
+        const dSemi = parseInt(intervalDef.DeltaSemitone);
+        const newBaseDeg = (rootStruct.baseDegree + dDeg) % 7;
+        const baseNames = ['C','D','E','F','G','A','B'];
+        const newBaseName = baseNames[newBaseDeg];
+        const naturalSemis = {C:0, D:2, E:4, F:5, G:7, A:9, B:11};
+        const targetNaturalSemi = naturalSemis[newBaseName];
+        const targetSemi = (rootStruct.semitone + dSemi) % 12;
+        let bestAcc = 0;
+        let minErr = 999;
+        for (let a = -4; a <= 4; a++) {
+            let checkSemi = (targetNaturalSemi + a + 120) % 12;
+            if (checkSemi === targetSemi) {
+                if (Math.abs(a) < Math.abs(bestAcc) || minErr === 999) {
+                    bestAcc = a;
+                    minErr = 0;
+                }
+            }
+        }
+        let accStr = "";
+        if (bestAcc > 0) accStr = "#".repeat(bestAcc);
+        else if (bestAcc < 0) accStr = "b".repeat(Math.abs(bestAcc));
+        if (bestAcc === 2 && accStr === "") accStr = "x";
+        return { name: newBaseName + accStr, semi: targetSemi, interval: intervalId };
+    }
+    getInterval(rootStruct, chordRootStruct) {
+        const dDeg = (chordRootStruct.baseDegree - rootStruct.baseDegree + 7) % 7;
+        const dSemi = (chordRootStruct.semitone - rootStruct.semitone + 12) % 12;
+        const match = jcscDB.intervals.find(i => 
+            parseInt(i.DeltaDegree) === dDeg && 
+            parseInt(i.DeltaSemitone) === dSemi
+        );
+        return match ? match.IntervalID : null;
+    }
+    formatNoteList(notes) {
+        return notes.map(n => n.name.padEnd(6, ' ')).join('');
+    }
+    analyze(keyStr, chordInput) {
+        const res = {
+            input: chordInput, isValid: false, roman: "-", func: "-", scaleName: "-", chordTonesDisplay: "", scaleTonesDisplay: "", keyboardMap: {} 
+        };
+        let keyRootStr = "C";
+        let keyType = "Major";
+        if (keyStr) {
+            keyStr = keyStr.trim();
+            if (keyStr.endsWith("m")) {
+                keyType = "Minor";
+                keyRootStr = keyStr.substring(0, keyStr.length - 1);
+            } else {
+                keyRootStr = keyStr;
+            }
+        }
+        const keyRoot = this.parseNoteStruct(keyRootStr);
+        const parts = this.splitChord(chordInput);
+        const chordRoot = this.parseNoteStruct(parts.root);
+        if (!keyRoot || !chordRoot) return res;
+        res.isValid = true;
+        const rootIntervalId = this.getInterval(keyRoot, chordRoot);
+        if (!rootIntervalId) {
+            res.roman = "Err:Int"; 
+        } else {
+            let candidates = jcscDB.rules.filter(r => 
+                r.KeyType === keyType && r.DegreeIntervalID === rootIntervalId && r.ChordSymbol === parts.quality
+            );
+            let rule = candidates.find(r => r.UsageType === "Main") || candidates[0];
+            if (rule) {
+                res.roman = rule.DegreeIntervalID;
+                res.func = rule.HarmonicFunction || "";
+                res.scaleName = rule.ScaleName;
+            } else {
+                res.roman = rootIntervalId;
+                res.scaleName = "(No Rule)";
+            }
+        }
+        const chordDef = this.chords[parts.quality];
+        const scaleDef = this.scales[res.scaleName];
+        const calcNotes = (strList) => {
+            if (!strList) return [];
+            return String(strList).split(',').map(s => s.trim()).filter(s=>s).map(intId => {
+                return this.calculateNoteFromInterval(chordRoot, intId);
+            });
+        };
+        let cTones = [];
+        let sTones = [];
+        let gIntervals = [];
+        let aIntervals = [];
+        if (chordDef) {
+            cTones = calcNotes(chordDef.IntervalsStructure);
+            gIntervals = String(chordDef.GuideToneIntervals || "").split(',').map(s=>s.trim());
+        }
+        if (scaleDef) {
+            sTones = calcNotes(scaleDef.IntervalsStructure);
+            aIntervals = String(scaleDef.AvoidNoteIntervals || "").split(',').map(s=>s.trim());
+        }
+        const kb = {};
+        cTones.forEach(t => {
+            if(!kb[t.semi]) kb[t.semi] = { isChord: false, dotType: null };
+            kb[t.semi].isChord = true;
+        });
+        sTones.forEach(t => {
+            if(!kb[t.semi]) kb[t.semi] = { isChord: false, dotType: null };
+            let type = 'scale'; 
+            if (aIntervals.includes(t.interval)) type = 'avoid';
+            else if (gIntervals.includes(t.interval)) type = 'guide';
+            if (t.interval === 'P1') type = 'root'; 
+            const priorities = { 'root': 4, 'avoid': 3, 'guide': 2, 'scale': 1, null: 0 };
+            if (priorities[type] > priorities[kb[t.semi].dotType]) {
+                kb[t.semi].dotType = type;
+            }
+        });
+        res.keyboardMap = kb;
+        res.chordTonesDisplay = this.formatNoteList(cTones);
+        const scaleToneNames = sTones.map(t => {
+            let name = t.name;
+            if (aIntervals.includes(t.interval)) return { name: `(${name})` };
+            if (gIntervals.includes(t.interval)) return { name: `${name}'` };
+            return { name: name };
+        });
+        res.scaleTonesDisplay = this.formatNoteList(scaleToneNames);
+        return res;
+    }
+}
+const jcscEngine = new TheoryEngine();
+
+const jcscApp = {
+    rows: [
+        { key: "Ebm", chord: "Ebm" }, { key: "Ebm", chord: "Bbm7" }, { key: "Gb",  chord: "BM7" }, { key: "Gb",  chord: "Abm6" },
+        { key: "Gb",  chord: "Bbm7" }, { key: "Gb",  chord: "Ebm7" }, { key: "Gb",  chord: "Abm7" }, { key: "Gb",  chord: "Db7" },
+        { key: "Gb",  chord: "GbM7" }, { key: "Ebm", chord: "Fm7b5" }, { key: "Ebm", chord: "Bb7b9" }
+    ],
+    
+    NOTES_SHARP: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
+    NOTES_FLAT:  ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'],
+
+    init() {
+        this.renderTable();
+        this.setupKeyboardUI();
+    },
+    insertRow(index) {
+        const refRow = this.rows[index];
+        this.rows.splice(index + 1, 0, { key: refRow.key, chord: "" });
+        this.renderTable();
+    },
+    deleteRow(index) {
+        if(this.rows.length <= 1) { this.rows[0].chord = ""; } else { this.rows.splice(index, 1); }
+        this.renderTable();
+    },
+    updateRow(index, field, value) {
+        const cleanValue = value.replace(/(\r\n|\n|\r)/gm, "");
+        if (cleanValue !== value) {
+            this.rows[index][field] = cleanValue;
+            this.renderTable();
+        } else {
+            this.rows[index][field] = value;
+            this.recalcAll();
+        }
+    },
+    handleEnter(e, el) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } },
+    recalcAll() { this.renderTable(); },
+    
+    transposeAll(semitoneDelta, useFlat) {
+        const noteList = useFlat ? this.NOTES_FLAT : this.NOTES_SHARP;
+        const getNoteIndex = (noteStr) => {
+            if(!noteStr) return -1;
+            const parsed = jcscEngine.parseNoteStruct(noteStr);
+            if(!parsed) return -1;
+            return parsed.semitone; 
+        };
+        const getNewNoteName = (currentIdx) => {
+            if(currentIdx === -1) return "";
+            const newIdx = (currentIdx + semitoneDelta + 120) % 12; 
+            return noteList[newIdx];
+        };
+
+        this.rows.forEach(row => {
+            let keyRoot = row.key;
+            let keySuffix = "";
+            if(row.key.endsWith("m")) {
+                keyRoot = row.key.substring(0, row.key.length - 1);
+                keySuffix = "m";
+            }
+            const keyIdx = getNoteIndex(keyRoot);
+            if(keyIdx !== -1) {
+                row.key = getNewNoteName(keyIdx) + keySuffix;
+            }
+            if(row.chord) {
+                const parts = jcscEngine.splitChord(row.chord);
+                if(parts.root) {
+                    const chordIdx = getNoteIndex(parts.root);
+                    if(chordIdx !== -1) {
+                        row.chord = getNewNoteName(chordIdx) + parts.quality;
+                    }
+                }
+            }
+        });
+        
+        this.renderTable();
+        const selected = document.querySelector('.selected-row');
+        if(selected) {
+            selected.click(); 
+        }
+    },
+
+    copyTSV() {
+        let tsv = "#\tKey\tChord\tDeg\tFunc\tScale Name\tChord Tones\tScale Notes\n";
+        this.rows.forEach((row, i) => {
+            const analysis = jcscEngine.analyze(row.key, row.chord);
+            const cTones = analysis.chordTonesDisplay.replace(/\s+/g, ' ').trim();
+            const sNotes = analysis.scaleTonesDisplay.replace(/\s+/g, ' ').trim();
+            tsv += `${i+1}\t${row.key}\t${row.chord}\t${analysis.roman}\t${analysis.func}\t${analysis.scaleName}\t${cTones}\t${sNotes}\n`;
+        });
+        navigator.clipboard.writeText(tsv).then(() => { alert("Copied to clipboard!"); });
+    },
+    renderTable() {
+        const tbody = document.querySelector('#mainTable tbody');
+        tbody.innerHTML = '';
+        this.rows.forEach((row, i) => {
+            const analysis = jcscEngine.analyze(row.key, row.chord);
+            const tr = document.createElement('tr');
+            tr.onclick = () => this.highlightRow(i);
+            
+            const actions = `
+                <button class="btn-action btn-add" onclick="event.stopPropagation(); jcscApp.insertRow(${i})">+</button>
+                <button class="btn-action btn-del" onclick="event.stopPropagation(); jcscApp.deleteRow(${i})">-</button>
+            `;
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td class="col-key">
+                    <div class="editable-cell" contenteditable="true" 
+                         onfocus="jcscApp.highlightRow(${i})"
+                         onblur="jcscApp.updateRow(${i}, 'key', this.innerText)" 
+                         onkeydown="jcscApp.handleEnter(event, this)">${row.key}</div>
+                </td>
+                <td class="col-chord">
+                    <div class="editable-cell" contenteditable="true" 
+                         onfocus="jcscApp.highlightRow(${i})"
+                         onblur="jcscApp.updateRow(${i}, 'chord', this.innerText)" 
+                         onkeydown="jcscApp.handleEnter(event, this)">${row.chord}</div>
+                </td>
+                <td>${analysis.roman}</td>
+                <td>${analysis.func}</td>
+                <td>${analysis.scaleName}</td>
+                <td class="mono-col">${analysis.chordTonesDisplay}</td>
+                <td class="mono-col">${analysis.scaleTonesDisplay}</td>
+                <td style="text-align:center;">${actions}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+    highlightRow(index) {
+        const row = this.rows[index];
+        if (!row) return;
+        const analysis = jcscEngine.analyze(row.key, row.chord);
+
+        const rows = document.querySelectorAll('#mainTable tbody tr');
+        rows.forEach(r => r.classList.remove('selected-row'));
+        if (rows[index]) rows[index].classList.add('selected-row');
+        
+        this.updateKeyboard(analysis.keyboardMap);
+        onRowHighlight(row.key, row.chord);
+    },
+    setupKeyboardUI() {
+        const kb = document.getElementById('keyboard');
+        let html = '';
+        const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const isBlack = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+        for(let oct=0; oct<3; oct++) {
+            for(let i=0; i<12; i++) {
+                const type = isBlack[i] ? 'black' : 'white';
+                html += `<div class="key ${type}" data-semi="${i}"><div class="key-label">${notes[i]}</div></div>`;
+            }
+        }
+        html += `<div class="key white" data-semi="0"><div class="key-label">C</div></div>`;
+        kb.innerHTML = html;
+    },
+    updateKeyboard(map) {
+        const keys = document.querySelectorAll('.key');
+        keys.forEach(k => {
+            k.classList.remove('chord-bg');
+            const oldDot = k.querySelector('.dot');
+            if(oldDot) oldDot.remove();
+            const semi = parseInt(k.getAttribute('data-semi'));
+            if (map && map[semi]) {
+                const data = map[semi];
+                if (data.isChord) k.classList.add('chord-bg');
+                if (data.dotType) {
+                    const dot = document.createElement('div');
+                    dot.className = `dot ${data.dotType}`;
+                    k.appendChild(dot);
+                }
+            }
+        });
+    }
+};
+
+
+jcscApp.init();
+
+// --- CoF LOGIC ---
+const cofTheory = {
+    circleOrder: ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"],
+    innerOrder:  ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "D#m", "Bbm", "Fm", "Cm", "Gm", "Dm"],
+    getKeyInfo(step, isMinor, mode) {
+        const rem = step % 12;
+        let idx = rem;
+        if (idx < 0) idx += 12;
+        let label = "";
+        let sigCount = 0;
+        if (idx === 7) { 
+            if (mode === 'SHARP') { label = "C#"; sigCount = 7; } else { label = "Db"; sigCount = -5; }
+        } else if (idx === 6) { 
+            if (mode === 'FLAT') { label = "Gb"; sigCount = -6; } else { label = "F#"; sigCount = 6; }
+        } else if (idx === 5) { 
+            if (mode === 'FLAT') { label = "Cb"; sigCount = -7; } else { label = "B"; sigCount = 5; }
+        } else {
+            label = this.circleOrder[idx];
+            const sigs = [0, 1, 2, 3, 4, 5, 6, -5, -4, -3, -2, -1];
+            sigCount = sigs[idx];
+        }
+        if (isMinor) {
+            const majorToMinorMap = {
+                "C": "Am", "G": "Em", "D": "Bm", "A": "F#m", "E": "C#m", "B": "G#m",
+                "F#": "D#m", "C#": "A#m",
+                "F": "Dm", "Bb": "Gm", "Eb": "Cm", "Ab": "Fm", "Db": "Bbm", "Gb": "Ebm", "Cb": "Abm"
+            };
+            label = majorToMinorMap[label] || label + "m";
+        }
+        return { label, sigCount, idx };
+    }
+};
+const SVG_PATHS = {
+    treble: "M 133.3 213.0 L 131.3 211.0 C 129.3 209.0 125.3 205.0 126.2 199.3 127.1 193.5 132.9 186.0 139.9 184.9 146.9 183.8 155.0 189.1 158.8 195.6 162.6 202.2 162.1 210.0 156.7 216.0 151.3 222.1 140.9 226.5 130.6 223.5 120.3 220.5 110.0 210.1 112.6 196.7 115.1 183.2 130.4 166.7 140.1 154.1 149.8 141.6 153.7 133.0 154.1 124.5 154.5 115.9 151.2 107.4 147.2 108.0 143.1 108.7 138.3 118.5 138.3 141.1 138.3 163.8 143.1 199.2 145.4 219.6 147.7 240.1 147.4 245.6 145.3 249.3 143.3 253.0 139.5 254.9 135.8 255.0 132.2 255.0 128.7 253.2 127.9 251.0 127.2 248.8 129.0 246.1 131.1 245.8 133.1 245.4 135.4 247.4 135.7 248.6 136.1 249.7 134.7 250.2 134.0 250.4 L 133.2 250.6",
+    bassHook: "M 170.7 156.1 L 169.8 156.1 C 169.0 156.1 167.3 156.1 166.5 155.2 C 165.6 154.3 165.6 152.5 166.9 151.3 C 168.1 150.2 170.6 149.6 172.6 150.5 C 174.6 151.5 176.0 154.0 174.8 156.0 C 173.5 158.1 169.6 159.7 166.3 158.5 C 163.0 157.3 160.4 153.4 161.3 148.3 C 162.3 143.2 166.8 136.9 174.3 134.3 C 181.7 131.7 192.2 132.8 198.3 136.8 C 204.4 140.8 206.3 147.7 206.5 154.6 C 206.7 161.6 205.3 168.5 202.3 175.2 C 199.3 181.8 194.7 188.2 188.3 193.4 C 181.8 198.6 173.6 202.6 169.5 204.7 L 165.4 206.7",
+    sharp: `<line x1="182.0" y1="192.7" x2="182.0" y2="251.8" stroke-width="3.1" /><line x1="190.0" y1="187.9" x2="190.0" y2="247.0" stroke-width="3.1" /><line x1="178.0" y1="209.0" x2="194.0" y2="206.0" stroke-width="7.0" /><line x1="178.0" y1="234.0" x2="194.0" y2="231.0" stroke-width="7.0" />`,
+    flat: `<polyline points="179.9 203.4 180.0 215.6 180.3 255.2" stroke-width="4" fill="none" /><path d="M 181.6 239.0 L 182.3 238.4 C 183.0 237.8 184.5 236.6 186.1 235.7 C 187.7 234.7 189.5 234.0 190.8 234.5 C 192.1 235.1 193.0 236.9 193.0 238.8 C 193.0 240.8 192.1 242.9 191.1 244.6 C 190.1 246.3 188.9 247.7 187.4 249.0 C 185.8 250.3 183.9 251.6 182.9 252.2 L 181.9 252.9" stroke-width="6" fill="none" />`
+};
+
+const CircleUI = {
+    cx: 210, cy: 210, rOuter: 140, rMiddle: 95, rInner: 45, rotation: 0, activeStep: 0,
+    init() {
+        this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        this.svg.setAttribute("viewBox", "0 0 420 420"); 
+        this.svg.setAttribute("width", "100%");
+        this.svg.setAttribute("height", "100%");
+        
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        defs.innerHTML = `<radialGradient id="knobGrad" cx="50%" cy="50%" r="50%" fx="30%" fy="30%"><stop offset="0%" style="stop-color:#fafafa; stop-opacity:1" /><stop offset="100%" style="stop-color:#999; stop-opacity:1" /></radialGradient>`;
+        this.svg.appendChild(defs);
+        document.getElementById('circleWrapper').appendChild(this.svg);
+        this.renderWheel();
+        this.renderHandle();
+        this.updateRotation(0);
+        this.setupDrag();
+    },
+    renderWheel() {
+        this.wheelG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.svg.appendChild(this.wheelG);
+        for (let i = 0; i < 12; i++) {
+            const deg = i * 30;
+            this.wheelG.appendChild(this.createSector(this.rMiddle, this.rOuter, deg, cofTheory.circleOrder[i], i, 'major'));
+            this.wheelG.appendChild(this.createSector(this.rInner, this.rMiddle, deg, cofTheory.innerOrder[i], i, 'minor'));
+        }
+    },
+    createSector(rIn, rOut, deg, text, i, type) {
+        const start = deg - 15;
+        const end = deg + 15;
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", this.arcPath(this.cx, this.cy, rIn, rOut, start, end));
+        path.setAttribute("class", `sector sector-${type}`);
+        path.setAttribute("data-idx", i);
+        path.onclick = () => cofApp.jumpTo(i);
+        g.appendChild(path);
+        const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        txt.textContent = text;
+        txt.setAttribute("id", `text-${type}-${i}`);
+        txt.setAttribute("class", `sector-text${type==='minor'?'-inner':''}`);
+        txt.setAttribute("data-deg", deg);
+        const rTxt = (rIn + rOut) / 2;
+        const rad = (deg - 90) * Math.PI / 180;
+        txt.setAttribute("x", this.cx + rTxt * Math.cos(rad));
+        txt.setAttribute("y", this.cy + rTxt * Math.sin(rad));
+        g.appendChild(txt);
+        return g;
+    },
+    renderHandle() {
+        this.handleG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.handleG.setAttribute("class", "handle-group");
+        const hRad = this.rOuter + 22; 
+        
+        const hit = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        hit.setAttribute("cx", 0); hit.setAttribute("cy", -hRad); hit.setAttribute("r", 40); hit.setAttribute("class", "handle-hit");
+        this.handleG.appendChild(hit);
+
+        const arrLeft = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        arrLeft.setAttribute("d", this.createThornArrow(hRad, -102, -114));
+        arrLeft.setAttribute("class", "handle-arrow");
+        this.handleG.appendChild(arrLeft);
+
+        const arrRight = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        arrRight.setAttribute("d", this.createThornArrow(hRad, -78, -66));
+        arrRight.setAttribute("class", "handle-arrow");
+        this.handleG.appendChild(arrRight);
+
+        const knob = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        knob.setAttribute("cx", 0); knob.setAttribute("cy", -hRad); knob.setAttribute("r", 14); knob.setAttribute("fill", "url(#knobGrad)"); knob.setAttribute("class", "handle-knob");
+        this.handleG.appendChild(knob);
+        this.svg.appendChild(this.handleG);
+    },
+    createThornArrow(radius, startDeg, endDeg) {
+        const degToRad = d => d * Math.PI / 180; const wBase = 4; const p = (r, deg) => ({ x: r * Math.cos(degToRad(deg)), y: r * Math.sin(degToRad(deg)) });
+        const sIn = p(radius - wBase, startDeg); const sOut = p(radius + wBase, startDeg); const tip = p(radius, endDeg);
+        return `M ${sOut.x} ${sOut.y} Q ${p(radius + 1, (startDeg+endDeg)/2).x} ${p(radius + 1, (startDeg+endDeg)/2).y} ${tip.x} ${tip.y} Q ${p(radius - 1, (startDeg+endDeg)/2).x} ${p(radius - 1, (startDeg+endDeg)/2).y} ${sIn.x} ${sIn.y} Z`;
+    },
+    updateRotation(deg) {
+        let currentStep = Math.round(-deg / 30);
+        if (currentStep >= 8) { currentStep -= 12; deg += 360; } else if (currentStep <= -8) { currentStep += 12; deg -= 360; }
+        this.rotation = deg; this.activeStep = currentStep;
+        this.wheelG.setAttribute("transform", `rotate(${deg}, ${this.cx}, ${this.cy})`);
+        this.handleG.setAttribute("transform", `translate(${this.cx},${this.cy}) rotate(${deg})`);
+        document.querySelectorAll('text[data-deg]').forEach(t => {
+            const base = parseFloat(t.getAttribute('data-deg')); const x = parseFloat(t.getAttribute('x')); const y = parseFloat(t.getAttribute('y'));
+            t.setAttribute("transform", `rotate(${-deg}, ${x}, ${y})`);
+        });
+        if (this.activeStep === 0) cofApp.currentMode = 'NATURAL'; else if (this.activeStep > 0) cofApp.currentMode = 'SHARP'; else cofApp.currentMode = 'FLAT';
+        this.updateLabels(); cofApp.updateKey();
+    },
+    updateLabels() {
+        for (let i = 0; i < 12; i++) {
+            const infoMajor = cofTheory.getKeyInfo(i, false, cofApp.currentMode);
+            const infoMinor = cofTheory.getKeyInfo(i, true, cofApp.currentMode);
+            const txtMaj = document.getElementById(`text-major-${i}`); if (txtMaj) txtMaj.textContent = infoMajor.label;
+            const txtMin = document.getElementById(`text-minor-${i}`); if (txtMin) txtMin.textContent = infoMinor.label;
+        }
+    },
+    arcPath(cx, cy, rIn, rOut, startAngle, endAngle) {
+        const start = (startAngle - 90) * Math.PI / 180; const end = (endAngle - 90) * Math.PI / 180;
+        const x1 = cx + rOut * Math.cos(start); const y1 = cy + rOut * Math.sin(start); const x2 = cx + rOut * Math.cos(end); const y2 = cy + rOut * Math.sin(end);
+        const x3 = cx + rIn * Math.cos(end); const y3 = cy + rIn * Math.sin(end); const x4 = cx + rIn * Math.cos(start); const y4 = cy + rIn * Math.sin(start);
+        return `M ${x1} ${y1} A ${rOut} ${rOut} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 0 0 ${x4} ${y4} Z`;
+    },
+    setupDrag() {
+        let isDragging = false; 
+        let startAngle = 0; 
+        let startRot = 0; 
+        const getAngle = (clientX, clientY) => {
+            const rect = this.svg.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            return Math.atan2(clientY - centerY, clientX - centerX);
+        };
+        const start = (e) => {
+            isDragging = true; 
+            const pt = e.touches ? e.touches[0] : e; 
+            startAngle = getAngle(pt.clientX, pt.clientY); 
+            startRot = this.rotation; 
+            this.handleG.style.cursor = "grabbing"; 
+            cofApp.onDragStart();
+            e.preventDefault();
+        };
+        const move = (e) => {
+            if(!isDragging) return; 
+            const pt = e.touches ? e.touches[0] : e; 
+            const curAngle = getAngle(pt.clientX, pt.clientY);
+            let angleDiff = (curAngle - startAngle) * 180 / Math.PI; 
+            while (angleDiff <= -180) angleDiff += 360; 
+            while (angleDiff > 180) angleDiff -= 360;
+            this.updateRotation(startRot + angleDiff); 
+            e.preventDefault();
+        };
+        const end = () => { 
+            if(!isDragging) return; 
+            isDragging = false; 
+            this.handleG.style.cursor = "grab"; 
+            const snap = Math.round(this.rotation / 30) * 30; 
+            this.animateTo(snap); 
+            cofApp.onDragEnd();
+        };
+        this.handleG.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+        this.handleG.addEventListener('touchstart', start); window.addEventListener('touchmove', move, {passive: false}); window.addEventListener('touchend', end);
+    },
+    animateTo(target) {
+        let current = this.rotation;
+        const step = () => {
+            const diff = target - current; if (Math.abs(diff) < 0.5) { this.updateRotation(target); return; }
+            current += diff * 0.15; this.updateRotation(current); requestAnimationFrame(step);
+        }; step();
+    },
+    jumpTo(idx) {
+        let targetStep = idx; 
+        if (idx === 5 || idx === 6 || idx === 7) {
+            if (cofApp.currentMode === 'FLAT') { if (idx === 5) targetStep = -7; else if (idx === 6) targetStep = -6; else if (idx === 7) targetStep = -5; }
+            else if (cofApp.currentMode === 'NATURAL') { if (idx === 7) targetStep = -5; }
+        } else if (idx >= 8) { targetStep = idx - 12; }
+        const targetDeg = -targetStep * 30; let current = this.rotation; let diff = (targetDeg - current) % 360;
+        if (diff > 180) diff -= 360; if (diff < -180) diff += 360; CircleUI.animateTo(current + diff);
+    }
+};
+
+const StaffRenderer = {
+    render(sigCount) {
+        const box = document.getElementById('staffBox');
+        let html = `<svg viewBox="0 0 180 160" width="100%" height="100%"><line x1="10" y1="30" x2="10" y2="130" class="st-brace"/><g transform="translate(10, 30)">`;
+        for(let i=0; i<5; i++) html += `<line x1="0" y1="${i*10}" x2="160" y2="${i*10}" class="st-line"/>`;
+        html += `<path d="${SVG_PATHS.treble}" transform="translate(-38, -55) scale(0.42)" class="st-clef-stroke"/>${this.getAccidentals(sigCount, true)}</g><g transform="translate(10, 90)">`;
+        for(let i=0; i<5; i++) html += `<line x1="0" y1="${i*10}" x2="160" y2="${i*10}" class="st-line"/>`;
+        html += `<g transform="translate(-58, -55) scale(0.42)"><path d="${SVG_PATHS.bassHook}" class="st-clef-stroke"/><circle cx="223.6" cy="142.1" r="5.1" class="st-clef-fill"/><circle cx="223.6" cy="166.3" r="5.1" class="st-clef-fill"/></g>${this.getAccidentals(sigCount, false)}</g></svg>`;
+        box.innerHTML = html;
+    },
+    getAccidentals(count, isTreble) {
+        let html = ''; const isSharp = count > 0; const num = Math.abs(count); const svgContent = isSharp ? SVG_PATHS.sharp : SVG_PATHS.flat;
+        const tSharpY = [0, 15, -5, 10, 25, 5, 20]; const tFlatY = [20, 5, 25, 10, 30, 15, 35];
+        const bSharpY = [10, 25, 5, 20, 35, 15, 30]; const bFlatY = [30, 15, 35, 20, 40, 25, 45];
+        const yArr = isTreble ? (isSharp ? tSharpY : tFlatY) : (isSharp ? bSharpY : bFlatY);
+        const startX = 45; const spacing = 11.5;
+        for (let i=0; i<num; i++) {
+            const x = startX + i * spacing; const y = yArr[i]; const xOffset = isSharp ? -185 : -180; const yOffset = isSharp ? -222 : -245; 
+            html += `<g transform="translate(${x}, ${y}) scale(0.45) translate(${xOffset}, ${yOffset})" class="st-acc-custom">${svgContent}</g>`;
+        }
+        return html;
+    }
+};
+
+const cofApp = {
+    isMinor: false, 
+    currentMode: 'NATURAL',
+    activeChord: null,
+    dragStartIdx: -1, 
+
+    onDragStart() {
+        const info = cofTheory.getKeyInfo(CircleUI.activeStep, this.isMinor, this.currentMode);
+        this.dragStartIdx = info.idx;
+    },
+
+    onDragEnd() {
+        if (this.dragStartIdx === -1) return;
+        setTimeout(() => {
+            const info = cofTheory.getKeyInfo(CircleUI.activeStep, this.isMinor, this.currentMode);
+            const currentIdx = info.idx;
+            let diff = currentIdx - this.dragStartIdx;
+            if (diff !== 0) {
+                const stepDelta = (diff + 12) % 12; 
+                const semitoneDelta = (stepDelta * 7) % 12;
+                const useFlat = (this.currentMode === 'FLAT' || (this.currentMode === 'NATURAL' && (currentIdx === 11 || currentIdx >= 8)));
+                jcscApp.transposeAll(semitoneDelta, useFlat);
+            }
+            this.dragStartIdx = -1;
+        }, 300);
+    },
+
+    updateKey(newActiveChordData) {
+        if (newActiveChordData !== undefined) {
+            this.activeChord = newActiveChordData;
+        }
+        const activeData = this.activeChord;
+        const info = cofTheory.getKeyInfo(CircleUI.activeStep, cofApp.isMinor, cofApp.currentMode);
+        document.getElementById('keyNameDisplay').innerText = "Key : " + info.label;
+        StaffRenderer.render(info.sigCount);
+
+        const rootIdx = info.idx; 
+        const leftIdx = (rootIdx - 1 + 12) % 12; 
+        const rightIdx = (rootIdx + 1) % 12; 
+        const viiIdx = (rootIdx + 5) % 12; 
+        const tritoneIdx = (rootIdx + 7) % 12;   
+        
+        const removeH = () => document.querySelectorAll('.sector').forEach(s => s.setAttribute("class", s.getAttribute("class").replace(/ highlight-\w+/g, "")));
+        removeH();
+        
+        const getMaj = (i) => document.querySelector(`.sector-major[data-idx="${i}"]`); 
+        const getMin = (i) => document.querySelector(`.sector-minor[data-idx="${i}"]`);
+        const addH = (el, cls) => { if(el) el.classList.add(cls); };
+        
+        [leftIdx, rootIdx, rightIdx, viiIdx].forEach(i => { addH(getMaj(i), 'highlight-diatonic'); addH(getMin(i), 'highlight-diatonic'); });
+        addH(getMaj(tritoneIdx), 'highlight-tritone'); addH(getMin(tritoneIdx), 'highlight-tritone');
+        
+        if(activeData && activeData.idx !== -1) {
+            const idx = activeData.idx;
+            if (activeData.ring === 'minor') {
+                const el = getMin(idx);
+                addH(el, 'highlight-active');
+            } else {
+                const el = getMaj(idx);
+                addH(el, 'highlight-active');
+            }
+        }
+    },
+    setMode(minor) {
+        this.isMinor = minor; 
+        document.getElementById('btnMaj').classList.toggle('active', !minor); 
+        document.getElementById('btnMin').classList.toggle('active', minor);
+        const wrapper = document.getElementById('circleWrapper');
+        if (minor) { 
+            wrapper.classList.remove('mode-major'); wrapper.classList.add('mode-minor'); 
+        } else { 
+            wrapper.classList.remove('mode-minor'); wrapper.classList.add('mode-major'); 
+        }
+        CircleUI.updateLabels(); 
+        this.updateKey(); 
+    },
+    jumpTo(idx) { CircleUI.jumpTo(idx); }
+};
+
+document.getElementById('circleWrapper').classList.add('mode-major');
+CircleUI.init();
+window.onload = function() {
+    deselectAll();
+};
+</script>
+</body>
+</html>

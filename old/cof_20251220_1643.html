@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JCSC - CoF UI v14.0 (Natural-StepJump)</title>
+<style>
+    /* === Base Styles === */
+    :root {
+        --bg-body: #f4f4f4;
+        --bg-panel: #fff;
+        --text-main: #333;
+        --text-sub: #666;
+        --stroke-color: #aaa;
+        
+        /* Highlight Colors */
+        --hl-root: #ffcdd2;       
+        --hl-root-border: #e53935;
+        --hl-diatonic: #e1f5fe;   
+        --hl-diatonic-border: #039be5;
+        --hl-tritone: #fff9c4;        
+        --hl-tritone-border: #fbc02d;
+
+        /* Controls */
+        --arrow-color: #555;
+        --btn-bg: #e0e0e0;
+        --btn-text: #333;
+    }
+
+    body.dark-mode {
+        --bg-body: #121212;
+        --bg-panel: #1e1e1e;
+        --text-main: #e0e0e0;
+        --text-sub: #aaa;
+        --stroke-color: #555;
+
+        --hl-root: #b71c1c;
+        --hl-root-border: #ff8a80;
+        --hl-diatonic: #01579b;
+        --hl-diatonic-border: #4fc3f7;
+        --hl-tritone: #f57f17; 
+        --hl-tritone-border: #fff176;
+
+        --arrow-color: #bbb;
+        --btn-bg: #333;
+        --btn-text: #ddd;
+    }
+
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; transition: background 0.3s, color 0.3s; }
+
+    header {
+        padding: 10px 20px; background: var(--bg-panel); border-bottom: 1px solid var(--stroke-color);
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    h1 { font-size: 18px; margin: 0; }
+    .btn { background: var(--btn-bg); color: var(--btn-text); border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-size: 12px; }
+
+    .container {
+        display: flex; flex: 1; align-items: center; justify-content: center; gap: 50px; padding: 20px; overflow: hidden;
+    }
+
+    /* === Circle Area === */
+    .circle-wrapper {
+        width: 420px; height: 420px; position: relative;
+        flex-shrink: 0;
+        user-select: none;
+    }
+    svg { width: 100%; height: 100%; overflow: visible; }
+    
+    .sector { stroke: var(--stroke-color); stroke-width: 1px; fill: var(--bg-panel); transition: fill 0.2s, stroke 0.2s; cursor: pointer; }
+    .sector:hover { opacity: 0.9; }
+    
+    .sector-text { font-size: 14px; font-weight: bold; fill: var(--text-main); pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+    .sector-text-inner { font-size: 11px; fill: var(--text-sub); pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+
+    .highlight-root { fill: var(--hl-root) !important; stroke: var(--hl-root-border) !important; stroke-width: 2px !important; }
+    .highlight-diatonic { fill: var(--hl-diatonic) !important; stroke: var(--hl-diatonic-border) !important; stroke-width: 1.5px !important; }
+    .highlight-tritone { fill: var(--hl-tritone) !important; stroke: var(--hl-tritone-border) !important; stroke-width: 1px !important; stroke-dasharray: 4 2; }
+
+    /* Handle */
+    .handle-group { cursor: grab; }
+    .handle-group:active { cursor: grabbing; }
+    
+    .handle-knob { 
+        stroke: #999; stroke-width: 1px; 
+        filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.3));
+    }
+    .handle-arrow { fill: var(--arrow-color); pointer-events: none; }
+    .handle-hit { fill: transparent; } 
+
+    /* === Info Panel === */
+    .info-panel {
+        width: 220px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: var(--bg-panel); padding: 20px; border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .key-display { font-size: 28px; font-weight: bold; margin-bottom: 10px; text-align: center; }
+    
+    .toggle-group {
+        display: flex; background: var(--btn-bg); border-radius: 20px; padding: 2px; margin-bottom: 20px;
+    }
+    .toggle-opt {
+        padding: 5px 15px; font-size: 12px; cursor: pointer; border-radius: 18px; transition: background 0.2s, color 0.2s;
+    }
+    .toggle-opt.active { background: #fff; color: #000; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    body.dark-mode .toggle-opt.active { background: #555; color: #fff; }
+
+    .staff-box {
+        width: 180px; height: 160px;
+        background: #fff; border: 1px solid #ccc; border-radius: 4px;
+        display: flex; justify-content: center; align-items: center;
+    }
+    .st-line { stroke: #000; stroke-width: 1; }
+    
+    .st-clef-stroke { fill: none; stroke: #000; stroke-width: 7px; stroke-linecap: round; stroke-linejoin: round; }
+    .st-clef-fill { fill: #000; stroke: none; }
+    
+    .st-acc-custom {
+        fill: none;
+        stroke: #000;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    
+    .st-brace { stroke: #000; stroke-width: 2; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>JCSC: Circle of Fifths (Step-Jump)</h1>
+    <button class="btn" onclick="document.body.classList.toggle('dark-mode')">🌙 Dark Mode</button>
+</header>
+
+<div class="container">
+    <div class="circle-wrapper" id="circleWrapper"></div>
+
+    <div class="info-panel">
+        <div class="key-display" id="keyNameDisplay">Key : C</div>
+        
+        <div class="toggle-group">
+            <div class="toggle-opt active" id="btnMaj" onclick="app.setMode(false)">Major</div>
+            <div class="toggle-opt" id="btnMin" onclick="app.setMode(true)">Minor</div>
+        </div>
+
+        <div class="staff-box" id="staffBox"></div>
+    </div>
+</div>
+
+<script>
+const Theory = {
+    // 0:C ... 5:B ... 11:F
+    circleOrder: ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"],
+    innerOrder:  ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "D#m", "Bbm", "Fm", "Cm", "Gm", "Dm"],
+
+    // mode: 'SHARP' | 'FLAT' | 'NATURAL'
+    getKeyInfo(step, isMinor, mode) {
+        const rem = step % 12;
+        let idx = rem;
+        if (idx < 0) idx += 12;
+
+        let label = "";
+        let sigCount = 0;
+
+        // --- 3-State Label Logic ---
+        if (idx === 7) { // C# / Db
+            // Natural (Key:C) -> Db
+            // Flat -> Db
+            // Sharp -> C#
+            if (mode === 'SHARP') { label = "C#"; sigCount = 7; }
+            else { label = "Db"; sigCount = -5; }
+        } 
+        else if (idx === 6) { // F# / Gb
+            // Natural -> F#
+            // Sharp -> F#
+            // Flat -> Gb
+            if (mode === 'FLAT') { label = "Gb"; sigCount = -6; }
+            else { label = "F#"; sigCount = 6; }
+        } 
+        else if (idx === 5) { // B / Cb
+            // Natural -> B
+            // Sharp -> B
+            // Flat -> Cb
+            if (mode === 'FLAT') { label = "Cb"; sigCount = -7; }
+            else { label = "B"; sigCount = 5; }
+        } 
+        else {
+            label = this.circleOrder[idx];
+            // 0:C, 1:G ... 8:Ab(-4), 9:Eb(-3), 10:Bb(-2), 11:F(-1)
+            const sigs = [0, 1, 2, 3, 4, 5, 6, -5, -4, -3, -2, -1];
+            sigCount = sigs[idx];
+        }
+
+        if (isMinor) {
+            const majorToMinorMap = {
+                "C": "Am", "G": "Em", "D": "Bm", "A": "F#m", "E": "C#m", "B": "G#m",
+                "F#": "D#m", "C#": "A#m",
+                "F": "Dm", "Bb": "Gm", "Eb": "Cm", "Ab": "Fm", "Db": "Bbm", "Gb": "Ebm", "Cb": "Abm"
+            };
+            label = majorToMinorMap[label] || label + "m";
+        }
+
+        return { label, sigCount, idx };
+    }
+};
+
+const SVG_PATHS = {
+    treble: "M 133.3 213.0 L 131.3 211.0 C 129.3 209.0 125.3 205.0 126.2 199.3 127.1 193.5 132.9 186.0 139.9 184.9 146.9 183.8 155.0 189.1 158.8 195.6 162.6 202.2 162.1 210.0 156.7 216.0 151.3 222.1 140.9 226.5 130.6 223.5 120.3 220.5 110.0 210.1 112.6 196.7 115.1 183.2 130.4 166.7 140.1 154.1 149.8 141.6 153.7 133.0 154.1 124.5 154.5 115.9 151.2 107.4 147.2 108.0 143.1 108.7 138.3 118.5 138.3 141.1 138.3 163.8 143.1 199.2 145.4 219.6 147.7 240.1 147.4 245.6 145.3 249.3 143.3 253.0 139.5 254.9 135.8 255.0 132.2 255.0 128.7 253.2 127.9 251.0 127.2 248.8 129.0 246.1 131.1 245.8 133.1 245.4 135.4 247.4 135.7 248.6 136.1 249.7 134.7 250.2 134.0 250.4 L 133.2 250.6",
+    bassHook: "M 170.7 156.1 L 169.8 156.1 C 169.0 156.1 167.3 156.1 166.5 155.2 C 165.6 154.3 165.6 152.5 166.9 151.3 C 168.1 150.2 170.6 149.6 172.6 150.5 C 174.6 151.5 176.0 154.0 174.8 156.0 C 173.5 158.1 169.6 159.7 166.3 158.5 C 163.0 157.3 160.4 153.4 161.3 148.3 C 162.3 143.2 166.8 136.9 174.3 134.3 C 181.7 131.7 192.2 132.8 198.3 136.8 C 204.4 140.8 206.3 147.7 206.5 154.6 C 206.7 161.6 205.3 168.5 202.3 175.2 C 199.3 181.8 194.7 188.2 188.3 193.4 C 181.8 198.6 173.6 202.6 169.5 204.7 L 165.4 206.7",
+
+    sharp: `
+        <line x1="182.0" y1="192.7" x2="182.0" y2="251.8" stroke-width="3.1" />
+        <line x1="190.0" y1="187.9" x2="190.0" y2="247.0" stroke-width="3.1" />
+        <line x1="178.0" y1="209.0" x2="194.0" y2="206.0" stroke-width="7.0" />
+        <line x1="178.0" y1="234.0" x2="194.0" y2="231.0" stroke-width="7.0" />
+    `,
+    
+    flat: `
+        <polyline points="179.9 203.4 180.0 215.6 180.3 255.2" stroke-width="4" fill="none" />
+        <path d="M 181.6 239.0 L 182.3 238.4 C 183.0 237.8 184.5 236.6 186.1 235.7 C 187.7 234.7 189.5 234.0 190.8 234.5 C 192.1 235.1 193.0 236.9 193.0 238.8 C 193.0 240.8 192.1 242.9 191.1 244.6 C 190.1 246.3 188.9 247.7 187.4 249.0 C 185.8 250.3 183.9 251.6 182.9 252.2 L 181.9 252.9" stroke-width="6" fill="none" />
+    `
+};
+
+const CircleUI = {
+    cx: 210, cy: 210, 
+    rOuter: 140, rMiddle: 90, rInner: 50,
+    rotation: 0, 
+    activeStep: 0, // これを基準にモードを判定
+    
+    init() {
+        this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        this.svg.setAttribute("viewBox", "0 0 420 420"); 
+        
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        defs.innerHTML = `
+            <radialGradient id="knobGrad" cx="50%" cy="50%" r="50%" fx="30%" fy="30%">
+                <stop offset="0%" style="stop-color:#fafafa; stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#999; stop-opacity:1" />
+            </radialGradient>
+        `;
+        this.svg.appendChild(defs);
+
+        document.getElementById('circleWrapper').appendChild(this.svg);
+        this.renderWheel();
+        this.renderHandle();
+        this.updateRotation(0);
+        this.setupDrag();
+    },
+
+    renderWheel() {
+        this.wheelG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.svg.appendChild(this.wheelG);
+        for (let i = 0; i < 12; i++) {
+            const deg = i * 30;
+            this.wheelG.appendChild(this.createSector(this.rMiddle, this.rOuter, deg, Theory.circleOrder[i], i, 'major'));
+            this.wheelG.appendChild(this.createSector(this.rInner, this.rMiddle, deg, Theory.innerOrder[i], i, 'minor'));
+        }
+    },
+
+    createSector(rIn, rOut, deg, text, i, type) {
+        const start = deg - 15;
+        const end = deg + 15;
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", this.arcPath(this.cx, this.cy, rIn, rOut, start, end));
+        path.setAttribute("class", `sector sector-${type}`);
+        path.setAttribute("data-idx", i);
+        path.onclick = () => app.jumpTo(i);
+        g.appendChild(path);
+
+        const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        txt.textContent = text;
+        txt.setAttribute("id", `text-${type}-${i}`);
+        txt.setAttribute("class", `sector-text${type==='minor'?'-inner':''}`);
+        txt.setAttribute("data-deg", deg);
+        
+        const rTxt = (rIn + rOut) / 2;
+        const rad = (deg - 90) * Math.PI / 180;
+        txt.setAttribute("x", this.cx + rTxt * Math.cos(rad));
+        txt.setAttribute("y", this.cy + rTxt * Math.sin(rad));
+        g.appendChild(txt);
+        return g;
+    },
+
+    renderHandle() {
+        this.handleG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.handleG.setAttribute("class", "handle-group");
+        const hRad = this.rOuter + 22; 
+        
+        const hit = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        hit.setAttribute("cx", hRad); hit.setAttribute("cy", 0);
+        hit.setAttribute("r", 40);
+        hit.setAttribute("class", "handle-hit");
+        this.handleG.appendChild(hit);
+
+        const arrUp = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        arrUp.setAttribute("d", this.createThornArrow(hRad, -12, -24));
+        arrUp.setAttribute("class", "handle-arrow");
+        this.handleG.appendChild(arrUp);
+
+        const arrDown = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        arrDown.setAttribute("d", this.createThornArrow(hRad, 12, 24));
+        arrDown.setAttribute("class", "handle-arrow");
+        this.handleG.appendChild(arrDown);
+
+        const knob = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        knob.setAttribute("cx", hRad); knob.setAttribute("cy", 0);
+        knob.setAttribute("r", 14); 
+        knob.setAttribute("fill", "url(#knobGrad)");
+        knob.setAttribute("class", "handle-knob");
+        this.handleG.appendChild(knob);
+
+        this.svg.appendChild(this.handleG);
+    },
+
+    createThornArrow(radius, startDeg, endDeg) {
+        const degToRad = d => d * Math.PI / 180;
+        const wBase = 4; 
+        const p = (r, deg) => ({ x: r * Math.cos(degToRad(deg)), y: r * Math.sin(degToRad(deg)) });
+        const sIn = p(radius - wBase, startDeg);
+        const sOut = p(radius + wBase, startDeg);
+        const tip = p(radius, endDeg);
+        return `M ${sOut.x} ${sOut.y} Q ${p(radius + 1, (startDeg+endDeg)/2).x} ${p(radius + 1, (startDeg+endDeg)/2).y} ${tip.x} ${tip.y} Q ${p(radius - 1, (startDeg+endDeg)/2).x} ${p(radius - 1, (startDeg+endDeg)/2).y} ${sIn.x} ${sIn.y} Z`;
+    },
+
+    updateRotation(deg) {
+        // --- Step-Jump Logic ---
+        let currentStep = Math.round(-deg / 30);
+        
+        // 端っこを超えたらワープ（数値を強制的に反対側へ書き換え）
+        // 例: Step 8 (C#->Ab) になったら Step -4 (Ab) にする
+        if (currentStep >= 8) {
+            currentStep -= 12; // 8 -> -4
+            deg += 360;        // 角度も追従させる
+        } else if (currentStep <= -8) {
+            currentStep += 12; // -8 -> 4
+            deg -= 360;        // 角度も追従させる
+        }
+
+        this.rotation = deg;
+        this.activeStep = currentStep;
+
+        this.wheelG.setAttribute("transform", `rotate(${deg}, ${this.cx}, ${this.cy})`);
+        this.handleG.setAttribute("transform", `translate(${this.cx},${this.cy}) rotate(${deg})`);
+
+        document.querySelectorAll('text[data-deg]').forEach(t => {
+            const base = parseFloat(t.getAttribute('data-deg'));
+            const x = parseFloat(t.getAttribute('x'));
+            const y = parseFloat(t.getAttribute('y'));
+            t.setAttribute("transform", `rotate(${-deg}, ${x}, ${y})`);
+        });
+
+        // === 3-State Determination ===
+        if (this.activeStep === 0) {
+            app.currentMode = 'NATURAL';
+        } else if (this.activeStep > 0) {
+            app.currentMode = 'SHARP';
+        } else {
+            app.currentMode = 'FLAT';
+        }
+
+        this.updateLabels();
+        app.updateKey();
+    },
+    
+    updateLabels() {
+        for (let i = 0; i < 12; i++) {
+            const infoMajor = Theory.getKeyInfo(i, false, app.currentMode);
+            const infoMinor = Theory.getKeyInfo(i, true, app.currentMode);
+            
+            const txtMaj = document.getElementById(`text-major-${i}`);
+            if (txtMaj) txtMaj.textContent = infoMajor.label;
+            
+            const txtMin = document.getElementById(`text-minor-${i}`);
+            if (txtMin) txtMin.textContent = infoMinor.label;
+        }
+    },
+
+    arcPath(cx, cy, rIn, rOut, startAngle, endAngle) {
+        const start = (startAngle - 90) * Math.PI / 180;
+        const end = (endAngle - 90) * Math.PI / 180;
+        const x1 = cx + rOut * Math.cos(start);
+        const y1 = cy + rOut * Math.sin(start);
+        const x2 = cx + rOut * Math.cos(end);
+        const y2 = cy + rOut * Math.sin(end);
+        const x3 = cx + rIn * Math.cos(end);
+        const y3 = cy + rIn * Math.sin(end);
+        const x4 = cx + rIn * Math.cos(start);
+        const y4 = cy + rIn * Math.sin(start);
+        return `M ${x1} ${y1} A ${rOut} ${rOut} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 0 0 ${x4} ${y4} Z`;
+    },
+
+    setupDrag() {
+        let isDragging = false;
+        let startAngle = 0;
+        let startRot = 0;
+        const getAngle = (x, y) => Math.atan2(y - this.cy, x - this.cx);
+        const start = (e) => {
+            isDragging = true;
+            const pt = e.touches ? e.touches[0] : e;
+            const rect = this.svg.getBoundingClientRect();
+            startAngle = getAngle(pt.clientX - rect.left, pt.clientY - rect.top);
+            startRot = this.rotation;
+            this.handleG.style.cursor = "grabbing";
+            e.preventDefault();
+        };
+        const move = (e) => {
+            if(!isDragging) return;
+            const pt = e.touches ? e.touches[0] : e;
+            const rect = this.svg.getBoundingClientRect();
+            const curAngle = getAngle(pt.clientX - rect.left, pt.clientY - rect.top);
+            
+            let angleDiff = (curAngle - startAngle) * 180 / Math.PI;
+            while (angleDiff <= -180) angleDiff += 360;
+            while (angleDiff > 180) angleDiff -= 360;
+
+            this.updateRotation(startRot + angleDiff);
+            e.preventDefault();
+        };
+        const end = () => {
+            if(!isDragging) return;
+            isDragging = false;
+            this.handleG.style.cursor = "grab";
+            const snap = Math.round(this.rotation / 30) * 30;
+            this.animateTo(snap);
+        };
+        this.handleG.addEventListener('mousedown', start);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
+        this.handleG.addEventListener('touchstart', start);
+        window.addEventListener('touchmove', move, {passive: false});
+        window.addEventListener('touchend', end);
+    },
+
+    animateTo(target) {
+        let current = this.rotation;
+        const step = () => {
+            const diff = target - current;
+            if (Math.abs(diff) < 0.5) {
+                this.updateRotation(target);
+                return;
+            }
+            current += diff * 0.15;
+            this.updateRotation(current);
+            requestAnimationFrame(step);
+        };
+        step();
+    },
+
+    jumpTo(idx) {
+        let targetStep = idx; 
+        
+        // ジャンプ時は「現在のモードで最も近い場所」へ
+        if (idx === 5 || idx === 6 || idx === 7) {
+            if (app.currentMode === 'FLAT') {
+                // FlatModeならマイナス側へ
+                if (idx === 5) targetStep = -7;
+                else if (idx === 6) targetStep = -6;
+                else if (idx === 7) targetStep = -5;
+            } else if (app.currentMode === 'NATURAL') {
+                // Naturalなら表示通りに (Dbに注意)
+                if (idx === 7) targetStep = -5; // Db
+            }
+        } else if (idx >= 8) {
+            targetStep = idx - 12;
+        }
+
+        const targetDeg = -targetStep * 30;
+
+        let current = this.rotation;
+        let diff = (targetDeg - current) % 360;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+
+        CircleUI.animateTo(current + diff);
+    }
+};
+
+const StaffRenderer = {
+    render(sigCount) {
+        const box = document.getElementById('staffBox');
+        let html = `<svg viewBox="0 0 180 160" width="100%" height="100%">`;
+        html += `<line x1="10" y1="30" x2="10" y2="130" class="st-brace"/>`;
+        html += `<g transform="translate(10, 30)">`;
+        for(let i=0; i<5; i++) html += `<line x1="0" y1="${i*10}" x2="160" y2="${i*10}" class="st-line"/>`;
+        html += `<path d="${SVG_PATHS.treble}" transform="translate(-38, -55) scale(0.42)" class="st-clef-stroke"/>`;
+        html += this.getAccidentals(sigCount, true);
+        html += `</g>`;
+        html += `<g transform="translate(10, 90)">`;
+        for(let i=0; i<5; i++) html += `<line x1="0" y1="${i*10}" x2="160" y2="${i*10}" class="st-line"/>`;
+        html += `<g transform="translate(-58, -55) scale(0.42)">`;
+        html += `<path d="${SVG_PATHS.bassHook}" class="st-clef-stroke"/>`;
+        html += `<circle cx="223.6" cy="142.1" r="5.1" class="st-clef-fill"/>`;
+        html += `<circle cx="223.6" cy="166.3" r="5.1" class="st-clef-fill"/>`;
+        html += `</g>`;
+        html += this.getAccidentals(sigCount, false);
+        html += `</g></svg>`;
+        box.innerHTML = html;
+    },
+    getAccidentals(count, isTreble) {
+        let html = '';
+        const isSharp = count > 0;
+        const num = Math.abs(count);
+        const svgContent = isSharp ? SVG_PATHS.sharp : SVG_PATHS.flat;
+        const tSharpY = [0, 15, -5, 10, 25, 5, 20];
+        const tFlatY = [20, 5, 25, 10, 30, 15, 35];
+        const bSharpY = [10, 25, 5, 20, 35, 15, 30];
+        const bFlatY = [30, 15, 35, 20, 40, 25, 45];
+        const yArr = isTreble ? (isSharp ? tSharpY : tFlatY) : (isSharp ? bSharpY : bFlatY);
+        const startX = 60; 
+        const spacing = 11.5;
+        for (let i=0; i<num; i++) {
+            const x = startX + i * spacing;
+            const y = yArr[i];
+            const xOffset = isSharp ? -185 : -180;
+            const yOffset = isSharp ? -222 : -245; 
+            html += `<g transform="translate(${x}, ${y}) scale(0.45) translate(${xOffset}, ${yOffset})" class="st-acc-custom">`;
+            html += svgContent;
+            html += `</g>`;
+        }
+        return html;
+    }
+};
+
+const app = {
+    isMinor: false,
+    currentMode: 'NATURAL', // SHARP, FLAT, NATURAL
+
+    updateKey() {
+        const info = Theory.getKeyInfo(CircleUI.activeStep, app.isMinor, app.currentMode);
+        document.getElementById('keyNameDisplay').innerText = "Key : " + info.label;
+        
+        const rootIdx = info.idx;
+        const leftIdx = (rootIdx - 1 + 12) % 12;
+        const rightIdx = (rootIdx + 1) % 12;
+        const viiIdx = (rootIdx + 5) % 12;       // VII (Diatonic) -> Blue
+        
+        // 裏コード (Substitute Dominant) -> V7 (Root+1) のトライトーン (+6) = Root+7
+        const tritoneIdx = (rootIdx + 7) % 12;   
+        
+        const removeH = () => document.querySelectorAll('.sector').forEach(s => s.setAttribute("class", s.getAttribute("class").replace(/ highlight-\w+/g, "")));
+        
+        removeH();
+        const getMaj = (i) => document.querySelector(`.sector-major[data-idx="${i}"]`);
+        const getMin = (i) => document.querySelector(`.sector-minor[data-idx="${i}"]`);
+
+        const addH = (el, cls) => { if(el) el.classList.add(cls); };
+
+        // IV, I, V, VII を青色に
+        [leftIdx, rootIdx, rightIdx, viiIdx].forEach(i => {
+            addH(getMaj(i), 'highlight-diatonic');
+            addH(getMin(i), 'highlight-diatonic');
+        });
+
+        // 裏コードの位置（Dominantの対角線）を黄色に
+        addH(getMaj(tritoneIdx), 'highlight-tritone');
+        addH(getMin(tritoneIdx), 'highlight-tritone');
+
+        // Rootは赤色で上書き
+        if (app.isMinor) {
+            const el = getMin(rootIdx);
+            if(el) { el.classList.remove('highlight-diatonic'); el.classList.add('highlight-root'); }
+        } else {
+            const el = getMaj(rootIdx);
+            if(el) { el.classList.remove('highlight-diatonic'); el.classList.add('highlight-root'); }
+        }
+
+        StaffRenderer.render(info.sigCount);
+    },
+    setMode(minor) {
+        this.isMinor = minor;
+        document.getElementById('btnMaj').classList.toggle('active', !minor);
+        document.getElementById('btnMin').classList.toggle('active', minor);
+        CircleUI.updateLabels();
+        this.updateKey();
+    },
+    jumpTo(idx) {
+        CircleUI.jumpTo(idx);
+    }
+};
+
+CircleUI.init();
+app.updateKey();
+</script>
+</body>
+</html>

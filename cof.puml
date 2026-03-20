@@ -1,0 +1,27 @@
+@startuml
+title CoF Logic: Step-Jump System
+skinparam state {
+  BackgroundColor White
+  BorderColor Black
+  ArrowColor Black
+}
+
+state "<b>Natural Mode</b>\n(Step == 0)\nKey: C" as Natural
+state "<b>Sharp Mode</b>\n(Step: 1 ～ 7)\nKey: G ～ C#" as Sharp
+state "<b>Flat Mode</b>\n(Step: -1 ～ -7)\nKey: F ～ Cb" as Flat
+
+[*] --> Natural
+
+' 基本的な移動
+Natural -right-> Sharp : <b>C(0) → G(1)</b>\n(Step > 0)
+Sharp -left-> Natural : <b>G(1) → C(0)</b>\n(Step == 0)
+
+Natural -left-> Flat : <b>C(0) → F(-1)</b>\n(Step < 0)
+Flat -right-> Natural : <b>F(-1) → C(0)</b>\n(Step == 0)
+
+' ループ（ワープ）処理
+Sharp -down-> Flat : <b>C#(7) → Ab</b>\n(Stepが 8 になった瞬間)\n↓\n<b>Step を -4 に強制変換</b>\n(モードはFlatへ)
+
+Flat -up-> Sharp : <b>Cb(-7) → E</b>\n(Stepが -8 になった瞬間)\n↓\n<b>Step を 4 に強制変換</b>\n(モードはSharpへ)
+
+@enduml
